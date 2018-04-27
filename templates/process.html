@@ -1,0 +1,20 @@
+{% extends "layout.html" %}
+{% block title %}{{title}}{% endblock %}
+{% block head %}
+  {{ super() }}
+{% endblock %}
+{% block page %}{{title}}{% endblock %}
+{% block heading %}
+  {{ super() }}
+{% endblock %}
+{% block content %}
+  <h4>Current date/time: {{ current_time | datetimefilter }}</h4>
+  <br>
+  <p>File: {{my_string}}</p>
+  <p>Processing uploaded file...</p>
+  <p>Val: {{value}}</p>
+  <p>md5: {{md5}}</p>
+  {% block footer %}
+  {{super()}}
+  {% endblock %}
+{% endblock %}

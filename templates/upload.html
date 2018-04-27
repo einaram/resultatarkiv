@@ -1,0 +1,18 @@
+{% extends "layout.html" %}
+{% block title %}{{title}}{% endblock %}
+{% block head %}
+  {{ super() }}
+{% endblock %}
+{% block page %}{{title}}{% endblock %}
+{% block heading %}
+  {{ super() }}
+{% endblock %}
+{% block content %}
+  <form action="/process" method="post" enctype="multipart/form-data">
+      <p><input type="file" name="file">
+         <input type="submit" value="Upload"x>
+    </form>
+  {% block footer %}
+  {{super()}}
+  {% endblock %}
+{% endblock %}

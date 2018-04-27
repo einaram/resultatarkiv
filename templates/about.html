@@ -1,0 +1,15 @@
+{% extends "layout.html" %}
+{% block title %}{{title}}{% endblock %}
+{% block head %}
+  {{ super() }}
+{% endblock %}
+{% block page %}{{title}}{% endblock %}
+{% block heading %}
+  {{ super() }}
+{% endblock %}
+{% block content %}
+  <p>Statens stråleverns resultatarkiv</a>
+  {% block footer %}
+  {{super()}}
+  {% endblock %}
+{% endblock %}
