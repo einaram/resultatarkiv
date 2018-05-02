@@ -3,6 +3,7 @@ from xlrd import open_workbook
 from flask import Flask, render_template, request, redirect, url_for
 from werkzeug import secure_filename
 import hashlib
+import platform
 
 def md5sum(filename, blocksize=65536):
     hash = hashlib.md5()
@@ -12,7 +13,11 @@ def md5sum(filename, blocksize=65536):
     return hash.hexdigest()
 
 
-UPLOAD_FOLDER = '/tmp/'
+if platform.system()=='Windows':
+	UPLOAD_FOLDER = 'c:/windows/temp/'
+else:
+	UPLOAD_FOLDER = '/tmp'
+	
 ALLOWED_EXTENSIONS = set(['xls','xlsx'])
 
 import datetime
