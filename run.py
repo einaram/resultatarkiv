@@ -3,16 +3,15 @@ from xlrd import open_workbook
 from flask import Flask, render_template, request, redirect, url_for
 from werkzeug import secure_filename
 import hashlib
-
-def md5sum(filename, blocksize=65536):
-    hash = hashlib.md5()
-    with open(filename, "rb") as f:
-        for block in iter(lambda: f.read(blocksize), b""):
-            hash.update(block)
-    return hash.hexdigest()
+import platform
+from resark.processexcel import excelfile
 
 
-UPLOAD_FOLDER = '/tmp/'
+if platform.system()=='Windows':
+	UPLOAD_FOLDER = 'c:/windows/temp/'
+else:
+	UPLOAD_FOLDER = '/tmp'
+	
 ALLOWED_EXTENSIONS = set(['xls','xlsx'])
 
 import datetime
@@ -63,12 +62,10 @@ def process():
             filename = secure_filename(file.filename)
             filepath =os.path.join(app.config['UPLOAD_FOLDER'], filename) 
             file.save(filepath)
-            wb = open_workbook(filepath)
-            sht = wb.sheet_by_index(0)
-            cell=sht.cell(1,1)
-            md5=md5sum(filepath)
+            importfile=excelfile(filepath)
+            importfile.check()
     return render_template('process.html', my_string= request.files['file'].filename, 
-        title="Processing file", current_time=datetime.datetime.now(),value=cell,md5=md5)
+        title="Processing file", current_time=datetime.datetime.now(),value=importfile.cell,md5=importfile.md5)
 
 
 @app.route("/about")
