@@ -13,18 +13,25 @@ class Arm(object):
                "  DSPCode = {2}\n"
                .format(self.id, self.dsp_name, self.dsp_code))
 
-wb = open_workbook('sample.xlsx')
-for sheet in wb.sheets():
-    number_of_rows = sheet.nrows
-    number_of_columns = sheet.ncols
 
+def checkworkbook(filename):
+    wb = open_workbook(filename)
+    sht = wb.sheet_by_index(0)
+    projecttype=sht.cell(0,0)
+    project=sht.cell(1,0)
+    print(projecttype)
+    print(project)
+    number_of_rows = sht.nrows
+    number_of_columns = sht.ncols
     items = []
-
     rows = []
+    
+    
+    
     for row in range(1, number_of_rows):
         values = []
         for col in range(number_of_columns):
-            value  = (sheet.cell(row,col).value)
+            value  = (sht.cell(row,col).value)
             try:
                 value = str(int(value))
             except ValueError:
@@ -34,7 +41,10 @@ for sheet in wb.sheets():
         item = Arm(*values)
         items.append(item)
 
-for item in items:
-    print(item)
-    print("Accessing one single value (eg. DSPName): {0}".format(item.dsp_name))
-    print
+    for item in items:
+        print(item)
+        print("Accessing one single value (eg. DSPName): {0}".format(item.dsp_name))
+        print
+
+
+checkworkbook('../resultat_test/RAME Tokt.xlsx')
