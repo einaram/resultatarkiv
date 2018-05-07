@@ -40,10 +40,14 @@ class excelfile:
         self.CheckDataMessage = "Checked data in column '%s' of type %s, and found %i row(s) with error. Rows with error are available from object '%s'"
         self.NotCheckDataMessage = "Did not check column '%s' of type %s, because it is a string."   
         self.ShortSummaryValidation = "Checked data in %i columns. %i are OK, and %i are not ok and should be checked based on error messages above."
-        cnxn = pyodbc.connect("Driver={SQL Server Native Client 11.0};"
-                      "Server=NRPA-3220\\SQLEXPRESS;"
-                      "Database=DataArkiv;"
-                      "Trusted_Connection=yes;")
+        self.ExpectedBlank = "Forventet blank (%s)"
+        
+        self.server="Server=NRPA-3220\\SQLEXPRESS;"
+        #self.server="Server=databasix2\\databasix2;"
+        connectstring="Driver={SQL Server Native Client 11.0};"+self.server+"Database=DataArkiv;"+"Trusted_Connection=yes;"
+        cnxn = pyodbc.connect(
+                      connectstring
+                      )
         self.cursor = cnxn.cursor()
         
         
@@ -60,13 +64,30 @@ class excelfile:
         self.cursor.execute(sql,self.projectid)
         rows=self.cursor.fetchall()
         if len(rows)==0:
-            raise ValueError("Project not defined")
+            raise ValueError(self.InvalidProjectid)
         self.project=rows[0][0]
         if sht.cell_value(2,0) != "":
-            raise ValueError("Forventet blank (A2)")
+            raise ValueError(self.ExpectedBlank)
         self.fields=sht.row(3) 
         self.types=sht.row(4)
-        
+        sql="select top 10 shortname,attrtype,datatype,name from validData where not shortname is null"
+        self.cursor.execute(sql)
+        validData=self.cursor.fetchall()
+        # Count validated rows
+        OK=0
+        WRONG=0
+        sqlValid="select count(shortname) from validData where shortname=? and attrtype!='NUCLIDE'"
+        self.ShortnameStatus=[]
+        colnr=0
+        for field,type in zip(self.fields,self.types):
+            param=type.value
+            if param == "METADATA" or param == "BASE":
+                param=field.value
+            self.cursor.execute(sqlValid,param)
+            valid=self.cursor.fetchall()
+            self.ShortnameStatus.append(valid[0][0])
+            print(field.value,type.value,valid[0][0])
+        print(self.ShortnameStatus)
         
 
         
@@ -74,9 +95,6 @@ class excelfile:
     def debug(self):
         print(self.project)
         print(self.md5)
-        self.cursor.execute('Select * from projects')
-        for row in self.cursor:
-            print('row = %r' % (row,))
         
         
           
