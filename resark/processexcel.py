@@ -4,6 +4,8 @@ from xlrd.sheet import ctype_text
 import platform
 import hashlib
 import pyodbc 
+import re
+
 
 # Valid excel?
 # correct setup for import
@@ -76,18 +78,74 @@ class excelfile:
         # Count validated rows
         OK=0
         WRONG=0
-        sqlValid="select count(shortname) from validData where shortname=? and attrtype!='NUCLIDE'"
+        sqlValidNoNuc="select count(shortname) from validData where shortname=? and attrtype!='NUCLIDE'"
+        sqlValidGetParam="select count(shortname) from validData where shortname=? and attrtype=?"
+        
         self.ShortnameStatus=[]
         colnr=0
+        
+        ## Regular expression for checking for valid nuclide format
+        regexpnuc='^[A-Z]{1,2}([0-9]{1,3}m{0,1}){0,1}(\\_{0,1}[0-9]{0,3}){0,1}(\\#{0,1}[0-9]{0,9}){0,1}$'
         for field,type in zip(self.fields,self.types):
+        # field: dataHeader[1,]
+        # type:  dataHeader[2,]
+            valid=0
             param=type.value
             if param == "METADATA" or param == "BASE":
                 param=field.value
-            self.cursor.execute(sqlValid,param)
-            valid=self.cursor.fetchall()
-            self.ShortnameStatus.append(valid[0][0])
-            print(field.value,type.value,valid[0][0])
-        print(self.ShortnameStatus)
+            self.cursor.execute(sqlValidNoNuc,param)
+            valid=self.cursor.fetchall()[0][0]
+            if type.value == 'AREAID':
+                self.cursor.execute(sqlValidGetParam,param, "AREA")
+                valid=self.cursor.fetchall()[0][0]
+            if valid == 0:
+                self.cursor.execute(sqlValidGetParam,param, "QUANTITY")
+                n=self.cursor.fetchall()[0][0]
+                if n==1:
+                    self.cursor.execute(sqlValidGetParam,type.value, "UNIT")
+                    valid=self.cursor.fetchall()[0][0]
+                
+            # Valid should be either 1 or 0 - depending if the shortname exists or not.
+            if valid == 0: # Probably nuclide
+                c_nucl=""
+                nucl=field.value.split("_")
+                if len(nucl)==3:
+                    c_nucl = nucl[0]+"_"+nucl[1]
+                    c_ctrl = nucl[2]
+                elif len(nucl)==1:
+                    c_nucl=nucl[0]
+                    c_ctrl=None 
+                else:
+                    self.cursor.execute(sqlValidGetParam,nucl[1], "VALUE")
+                    validnuc=self.cursor.fetchall()[0][0]
+                    if validnuc ==1:
+                        c_nucl=nucl[0]
+                        c_ctrl=nucl[1]
+                    else:
+                        c_nucl = nucl[0]+"_"+nucl[1]
+                        c_ctrl = None
+                # print("nucl:",nucl)
+                # print("c_nucl:",c_nucl)
+                m=re.search(regexpnuc,c_nucl)
+                if m != None:
+                    basenuc=c_nucl.split("#")
+                    self.cursor.execute(sqlValidGetParam,basenuc[0], "NUCLIDE")
+                    validnuc=self.cursor.fetchall()[0][0]
+                    if validnuc == 1:
+                        if c_ctrl == None:
+                            current_nuclide=c_nucl
+                            self.cursor.execute(sqlValidGetParam,type.value, "UNITS")
+                            valid=self.cursor.fetchall()[0][0]
+                        else:
+                           # if current_nuclide == c_nucl: # This is a bug, this will never be true
+                            self.cursor.execute(sqlValidGetParam,c_ctrl, "VALUE") 
+                            valid=self.cursor.fetchall()[0][0]
+                 #   print(basenuc)
+                else:
+                    valid=0
+            self.ShortnameStatus.append(valid)
+            #print(field.value,type.value,valid)
+        #print(self.ShortnameStatus)
         
 
         
