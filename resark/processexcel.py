@@ -44,6 +44,11 @@ class excelfile:
         self.ShortSummaryValidation = "Checked data in %i columns. %i are OK, and %i are not ok and should be checked based on error messages above."
         self.ExpectedBlank = "Forventet blank (%s)"
         
+        self.sqlValidNoNuc="select count(shortname) from validData where shortname=? and attrtype!='NUCLIDE'"
+        self.sqlValidGetParam="select count(shortname) from validData where shortname=? and attrtype=?"
+             
+        self.nuclide=[]
+        self.ShortnameStatus=[]
         self.server="Server=NRPA-3220\\SQLEXPRESS;"
         #self.server="Server=databasix2\\databasix2;"
         connectstring="Driver={SQL Server Native Client 11.0};"+self.server+"Database=DataArkiv;"+"Trusted_Connection=yes;"
@@ -52,38 +57,53 @@ class excelfile:
                       )
         self.cursor = cnxn.cursor()
         
-        
     def check(self):
+        self.ShortnameStatus=[]
+        self.checkheader()
+        if self.validheader:
+            self.checkdata()
+    
+    
+    def checkdata(self):
+        if len(self.ShortnameStatus)==0:
+            raise ValueError(self.InvalidProjectid)
+        # Jumps out if either the header has not been processed or it has errors
+        col=0
+        for shortname,type in zip(self.fields,self.types):
+        # shortname: dataHeader[1,]
+        # type:  dataHeader[2,]
+            if shortname=="SAMPLETYPE":
+                valid=False
+                # self.cursor.execute(self.sqlValidGetParam,, "SAMPLETYPE")
+                # valid=self.cursor.fetchall()[0][0]
+                # for row in 5 to 
+                
+        
+    
+    def checkheader(self):
         self.md5=md5sum(self.file)
         wb = open_workbook(self.file)
-        sht = wb.sheet_by_index(0)
-        projecttype=sht.cell_value(0,0)
+        self.sht = wb.sheet_by_index(0)
+        projecttype=self.sht.cell_value(0,0)
         if projecttype != 'PROJECTID':
             raise ValueError("Ukjent prosjekttype (A1)")
             # TODO: Define project in import file
-        self.projectid=sht.cell_value(1,0)
+        self.projectid=self.sht.cell_value(1,0)
         sql="select name from projects where id = ?"
         self.cursor.execute(sql,self.projectid)
         rows=self.cursor.fetchall()
         if len(rows)==0:
             raise ValueError(self.InvalidProjectid)
         self.project=rows[0][0]
-        if sht.cell_value(2,0) != "":
+        if self.sht.cell_value(2,0) != "":
             raise ValueError(self.ExpectedBlank)
-        self.fields=sht.row(3) 
-        self.types=sht.row(4)
+        self.fields=self.sht.row(3) 
+        self.types=self.sht.row(4)
         sql="select top 10 shortname,attrtype,datatype,name from validData where not shortname is null"
         self.cursor.execute(sql)
         validData=self.cursor.fetchall()
         # Count validated rows
-        OK=0
-        WRONG=0
-        sqlValidNoNuc="select count(shortname) from validData where shortname=? and attrtype!='NUCLIDE'"
-        sqlValidGetParam="select count(shortname) from validData where shortname=? and attrtype=?"
-        
         self.ShortnameStatus=[]
-        colnr=0
-        
         ## Regular expression for checking for valid nuclide format
         regexpnuc='^[A-Z]{1,2}([0-9]{1,3}m{0,1}){0,1}(\\_{0,1}[0-9]{0,3}){0,1}(\\#{0,1}[0-9]{0,9}){0,1}$'
         for field,type in zip(self.fields,self.types):
@@ -93,20 +113,22 @@ class excelfile:
             param=type.value
             if param == "METADATA" or param == "BASE":
                 param=field.value
-            self.cursor.execute(sqlValidNoNuc,param)
+            self.cursor.execute(self.sqlValidNoNuc,param)
             valid=self.cursor.fetchall()[0][0]
             if type.value == 'AREAID':
-                self.cursor.execute(sqlValidGetParam,param, "AREA")
+                self.cursor.execute(self.sqlValidGetParam,param, "AREA")
                 valid=self.cursor.fetchall()[0][0]
             if valid == 0:
-                self.cursor.execute(sqlValidGetParam,param, "QUANTITY")
+                self.cursor.execute(self.sqlValidGetParam,param, "QUANTITY")
                 n=self.cursor.fetchall()[0][0]
                 if n==1:
-                    self.cursor.execute(sqlValidGetParam,type.value, "UNIT")
+                    self.cursor.execute(self.sqlValidGetParam,type.value, "UNIT")
                     valid=self.cursor.fetchall()[0][0]
                 
             # Valid should be either 1 or 0 - depending if the shortname exists or not.
+            nuclide=False
             if valid == 0: # Probably nuclide
+                nuclide=True
                 c_nucl=""
                 nucl=field.value.split("_")
                 if len(nucl)==3:
@@ -116,7 +138,7 @@ class excelfile:
                     c_nucl=nucl[0]
                     c_ctrl=None 
                 else:
-                    self.cursor.execute(sqlValidGetParam,nucl[1], "VALUE")
+                    self.cursor.execute(self.sqlValidGetParam,nucl[1], "VALUE")
                     validnuc=self.cursor.fetchall()[0][0]
                     if validnuc ==1:
                         c_nucl=nucl[0]
@@ -129,31 +151,36 @@ class excelfile:
                 m=re.search(regexpnuc,c_nucl)
                 if m != None:
                     basenuc=c_nucl.split("#")
-                    self.cursor.execute(sqlValidGetParam,basenuc[0], "NUCLIDE")
+                    self.cursor.execute(self.sqlValidGetParam,basenuc[0], "NUCLIDE")
                     validnuc=self.cursor.fetchall()[0][0]
                     if validnuc == 1:
                         if c_ctrl == None:
                             current_nuclide=c_nucl
-                            self.cursor.execute(sqlValidGetParam,type.value, "UNITS")
+                            self.cursor.execute(self.sqlValidGetParam,type.value, "UNITS")
                             valid=self.cursor.fetchall()[0][0]
                         else:
                            # if current_nuclide == c_nucl: # This is a bug, this will never be true
-                            self.cursor.execute(sqlValidGetParam,c_ctrl, "VALUE") 
+                            self.cursor.execute(self.sqlValidGetParam,c_ctrl, "VALUE") 
                             valid=self.cursor.fetchall()[0][0]
                  #   print(basenuc)
                 else:
                     valid=0
+                    nuclide=False
             self.ShortnameStatus.append(valid)
+            self.nuclide.append(nuclide)
             #print(field.value,type.value,valid)
         #print(self.ShortnameStatus)
-        
+        print(self.nuclide)
 
-        
+    def validheader(self):
+        valid = len(self.ShortnameStatus) > 0
+        valid = valid and not 0 in self.ShortnameStatus
+        return valid
         
     def debug(self):
         print(self.project)
         print(self.md5)
-        
+        print(self.ShortnameStatus)
         
           
 if __name__ == '__main__':
