@@ -65,7 +65,7 @@ def process():
             importfile=excelfile(filepath)
             importfile.check()
     return render_template('process.html', my_string= request.files['file'].filename, 
-        title="Processing file", current_time=datetime.datetime.now(),value=importfile.cell,md5=importfile.md5)
+        title="Processing file", current_time=datetime.datetime.now(),value=importfile.validheader(),md5=importfile.md5)
 
 
 @app.route("/about")
