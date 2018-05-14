@@ -43,10 +43,11 @@ class excelfile:
         self.NotCheckDataMessage = "Did not check column '%s' of type %s, because it is a string."   
         self.ShortSummaryValidation = "Checked data in %i columns. %i are OK, and %i are not ok and should be checked based on error messages above."
         self.ExpectedBlank = "Forventet blank (%s)"
-        
+        self.invalidColOrder = "%s må komme før %s"
         self.sqlValidNoNuc="select count(shortname) from validData where shortname=? and attrtype!='NUCLIDE'"
         self.sqlValidGetParam="select count(shortname) from validData where shortname=? and attrtype=?"
-             
+        self.sqlValidSubtype="select count(stl.id) from samplesubtypelist sstl left join sampletypelist stl on stl.id=sampletypelistid where stl.shortname=? and sstl.name =?"    
+        self.sqlValidMetadata="select count(smd.id) from samplemetadata smd left join metadatalist md on smd.metadataid=md.id where md.shortname=? and smd.value=?"
         self.nuclide=[]
         self.ShortnameStatus=[]
         self.server="Server=NRPA-3220\\SQLEXPRESS;"
@@ -69,17 +70,69 @@ class excelfile:
             raise ValueError(self.InvalidProjectid)
         # Jumps out if either the header has not been processed or it has errors
         col=0
+        validvalues=[]
+        sampletypecol=-1
+        parentcol=-1
+        parentdata=[]
+        nonhandeled=0
         for shortname,type in zip(self.fields,self.types):
-        # shortname: dataHeader[1,]
+		# shortname: dataHeader[1,]
         # type:  dataHeader[2,]
-            if shortname=="SAMPLETYPE":
+            xlcol=list(self.sht.col(col))
+            # print(xlcol)
+            del xlcol[:5] # remove five first to get rid of headers
+            # print(xlcol)
+            # print(shortname)
+            row=5
+            for cell in xlcol:
                 valid=False
-                # self.cursor.execute(self.sqlValidGetParam,, "SAMPLETYPE")
-                # valid=self.cursor.fetchall()[0][0]
-                # for row in 5 to 
-                
+                if shortname.value=="PARENT_ID":
+                    parentcol=col
+                    if len(parentdata)==0:
+                        for p in xlcol:
+                        #    print(p)
+                            if p.ctype !=xlrd.XL_CELL_EMPTY:
+                                parentdata.append(p.value)
+                        # print(parentdata)
+                    valid=True
+                elif shortname.value=="CONNECT_TO_PARENT":
+                    if len(parentdata)==0:
+                        raise ValueError(invalidColOrder)
+                    # print(cell.value)
+                    # print(parentdata.count(cell.value))
+                    valid=(parentdata.count(cell.value)>0 or cell.ctype==xlrd.XL_CELL_EMPTY)
+                    # print(valid)
+                elif shortname.value=="SAMPLETYPE":
+                    sampletypecol=col
+                    self.cursor.execute(self.sqlValidGetParam,cell.value, "SAMPLETYPE")
+                    valid=self.cursor.fetchall()[0][0]
+                elif shortname.value=="SAMPLESUBTYPE":
+                    if sampletypecol < 0:
+                        raise ValueError(invalidColOrder % ('Sampletype','Subtype'))
+                    sampletype=self.sht.cell_value(row,sampletypecol)
+                    self.cursor.execute(self.sqlValidSubtype,sampletype,cell.value)
+                    valid=self.cursor.fetchall()[0][0]
+                elif shortname.value=="REF_DATE":
+                    valid=cell.ctype==xlrd.XL_CELL_DATE
+                    # print(cell.value,cell.ctype,valid)
+                elif shortname.value == "LATITUDE":
+                    valid=(cell.ctype==xlrd.XL_CELL_NUMBER and  cell.value >=-90 and cell.value <=90)
+                elif shortname.value == "LONGITUDE":
+                    valid=(cell.ctype==xlrd.XL_CELL_NUMBER and  cell.value >=-180 and cell.value <=180)
+                elif type.value == "METADATA":
+                    self.cursor.execute(self.sqlValidMetadata,shortname.value,cell.value)
+                    valid=(self.cursor.fetchall()[0][0]>0 or cell.ctype==xlrd.XL_CELL_EMPTY)
+                   # print(cell.value,valid)
+                else: 
+                    nonhandeled=nonhandeled+1
+                validvalues.append(valid)
+                row=row+1
+            # print(col,sampletypecol)
+            col = col +1
+        self.validvalues=validvalues
+        self.nonhandeled=nonhandeled
         
-    
+        
     def checkheader(self):
         self.md5=md5sum(self.file)
         wb = open_workbook(self.file)
@@ -99,9 +152,9 @@ class excelfile:
             raise ValueError(self.ExpectedBlank)
         self.fields=self.sht.row(3) 
         self.types=self.sht.row(4)
-        sql="select top 10 shortname,attrtype,datatype,name from validData where not shortname is null"
-        self.cursor.execute(sql)
-        validData=self.cursor.fetchall()
+        # sql="select shortname,attrtype,datatype,name from validData where not shortname is null"
+        # self.cursor.execute(sql)
+        # validData=self.cursor.fetchall()
         # Count validated rows
         self.ShortnameStatus=[]
         ## Regular expression for checking for valid nuclide format
@@ -170,7 +223,7 @@ class excelfile:
             self.nuclide.append(nuclide)
             #print(field.value,type.value,valid)
         #print(self.ShortnameStatus)
-        print(self.nuclide)
+        # print(self.nuclide)
 
     def validheader(self):
         valid = len(self.ShortnameStatus) > 0
@@ -180,8 +233,10 @@ class excelfile:
     def debug(self):
         print(self.project)
         print(self.md5)
-        print(self.ShortnameStatus)
-        
+        # print(self.ShortnameStatus)
+        print("True:",self.validvalues.count(True))
+        print("False:",self.validvalues.count(False))
+        print("Nonhandeled:",self.nonhandeled)
           
 if __name__ == '__main__':
     test=excelfile('test.xlsx')
