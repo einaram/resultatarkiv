@@ -11,7 +11,7 @@ import re
 # correct setup for import
 # Run validation
 # Check if values makes sense
-# Check for new values
+# Check for new values where that should be checked
 # Abort if errors needs to be corrected
 # Ask for verification if new values are OK
 # Import if verified
@@ -74,6 +74,8 @@ class excelfile:
         # Jumps out if either the header has not been processed or it has errors
         col=0
         validvalues=[]
+        valueerror={}
+        valuewarning={}
         sampletypecol=-1
         parentcol=-1
         parentdata=[]
@@ -147,8 +149,19 @@ class excelfile:
                 elif shortname.value=="COMMENT":
                     valid=True
                 elif type.value == "UNCMETHOD":
+                    
                     self.cursor.execute(self.sqlValidUncmethod,cell.value)
                     valid=(self.cursor.fetchall()[0][0]>0 or cell.ctype==xlrd.XL_CELL_EMPTY)    
+                    if not valid:
+                        key="Unknown uncertainty definition"
+                        
+                        cellid=str(col)+"-"+str(row)+" ("+cell.value+")"
+                        #if valuewarning.has_key(key):
+                        if key in valuewarning:
+                            valuewarning[key].append(cellid)
+                        else:
+                            valuewarning[key]=[cellid]
+                      
                 else: 
                     if not cell.ctype==xlrd.XL_CELL_EMPTY:
                         print(type.value,shortname.value,cell.value)
@@ -159,6 +172,7 @@ class excelfile:
             col = col +1
         self.validvalues=validvalues
         self.nonhandeled=nonhandeled
+        self.valuewarning=valuewarning
         
         
     def checkheader(self):
@@ -270,6 +284,7 @@ class excelfile:
         print("True:",self.validvalues.count(True))
         print("False:",self.validvalues.count(False))
         print("Nonhandeled:",self.nonhandeled)
+        print(self.valuewarning)
           
 if __name__ == '__main__':
     test=excelfile('test.xlsx')

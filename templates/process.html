@@ -8,7 +8,7 @@
   {{ super() }}
 {% endblock %}
 {% block content %}
-  <h4>Current date/time: {{ current_time | datetimefilter }}</h4>
+  <p>Current date/time: {{ current_time | datetimefilter }}</p>
   <br>
   <p>File: {{my_string}}</p>
   <p>md5: {{md5}}</p>
@@ -16,6 +16,14 @@
   <p>Processing uploaded file...</p>
   <p>Valid header: {{okheader}}</p>
   <p>Valid data: {{okdata}}</p>
+  <h2>Warnings on data</h2>
+  <dl>
+  {% for key, value in valuewarnings.items() %}
+	<dt>{{ key }} : </dt>
+	<dd>{{ value }}</dd>
+  {% endfor %}
+</dl>
+  
   {% block footer %}
   {{super()}}
   {% endblock %}
