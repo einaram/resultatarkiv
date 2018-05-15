@@ -44,10 +44,13 @@ class excelfile:
         self.ShortSummaryValidation = "Checked data in %i columns. %i are OK, and %i are not ok and should be checked based on error messages above."
         self.ExpectedBlank = "Forventet blank (%s)"
         self.invalidColOrder = "%s må komme før %s"
+        
         self.sqlValidNoNuc="select count(shortname) from validData where shortname=? and attrtype!='NUCLIDE'"
         self.sqlValidGetParam="select count(shortname) from validData where shortname=? and attrtype=?"
         self.sqlValidSubtype="select count(stl.id) from samplesubtypelist sstl left join sampletypelist stl on stl.id=sampletypelistid where stl.shortname=? and sstl.name =?"    
         self.sqlValidMetadata="select count(smd.id) from samplemetadata smd left join metadatalist md on smd.metadataid=md.id where md.shortname=? and smd.value=?"
+        self.sqlValidLaboratory="select count(id) from samplevalue where laboratory = ?"
+        self.sqlValidUncmethod="select count(id) from samplevalue where uncmeasure = ?"
         self.nuclide=[]
         self.ShortnameStatus=[]
         self.server="Server=NRPA-3220\\SQLEXPRESS;"
@@ -75,6 +78,11 @@ class excelfile:
         parentcol=-1
         parentdata=[]
         nonhandeled=0
+        laboratory=[] # Workaround until database is updated with index on laboratory search ZZZ
+        units=[]
+        sql="select shortname from unitlist"
+        for row in self.cursor.execute(sql):
+            units.append(row[0])
         for shortname,type in zip(self.fields,self.types):
 		# shortname: dataHeader[1,]
         # type:  dataHeader[2,]
@@ -87,43 +95,63 @@ class excelfile:
             for cell in xlcol:
                 valid=False
                 if shortname.value=="PARENT_ID":
+                    # Anything is valid here, may need it later on for connection
                     parentcol=col
                     if len(parentdata)==0:
                         for p in xlcol:
-                        #    print(p)
                             if p.ctype !=xlrd.XL_CELL_EMPTY:
                                 parentdata.append(p.value)
-                        # print(parentdata)
                     valid=True
                 elif shortname.value=="CONNECT_TO_PARENT":
+                    # Should have a valid parent_id
                     if len(parentdata)==0:
                         raise ValueError(invalidColOrder)
-                    # print(cell.value)
-                    # print(parentdata.count(cell.value))
                     valid=(parentdata.count(cell.value)>0 or cell.ctype==xlrd.XL_CELL_EMPTY)
-                    # print(valid)
                 elif shortname.value=="SAMPLETYPE":
+                    # Valid if sampletype is defined
                     sampletypecol=col
                     self.cursor.execute(self.sqlValidGetParam,cell.value, "SAMPLETYPE")
                     valid=self.cursor.fetchall()[0][0]
                 elif shortname.value=="SAMPLESUBTYPE":
+                    # Valid if subtype is defined and correct for sampletype
                     if sampletypecol < 0:
                         raise ValueError(invalidColOrder % ('Sampletype','Subtype'))
                     sampletype=self.sht.cell_value(row,sampletypecol)
                     self.cursor.execute(self.sqlValidSubtype,sampletype,cell.value)
                     valid=self.cursor.fetchall()[0][0]
                 elif shortname.value=="REF_DATE":
+                    # Any date is valid
                     valid=cell.ctype==xlrd.XL_CELL_DATE
-                    # print(cell.value,cell.ctype,valid)
                 elif shortname.value == "LATITUDE":
+                    # Valid numbers from -90 to 90- inclusive
                     valid=(cell.ctype==xlrd.XL_CELL_NUMBER and  cell.value >=-90 and cell.value <=90)
                 elif shortname.value == "LONGITUDE":
+                    # Valid numbers from -180 to 180 - inclusive
                     valid=(cell.ctype==xlrd.XL_CELL_NUMBER and  cell.value >=-180 and cell.value <=180)
                 elif type.value == "METADATA":
+                    # Valid if value for metadata has been seen before
+                    # Need a warning for new value, invalid for new key
                     self.cursor.execute(self.sqlValidMetadata,shortname.value,cell.value)
                     valid=(self.cursor.fetchall()[0][0]>0 or cell.ctype==xlrd.XL_CELL_EMPTY)
-                   # print(cell.value,valid)
+                elif type.value == "LABORATORY":
+                    # Valid if laboratory seen before or empty
+                    # Todo: Either add index on laboratory (need to change the col to varchar(100)) 
+                    valid=(laboratory.count(cell.value)>0) # workaround ZZZ
+                    if not valid: # workaround ZZZ
+                        self.cursor.execute(self.sqlValidLaboratory,cell.value)
+                        valid=(self.cursor.fetchall()[0][0]>0 or cell.ctype==xlrd.XL_CELL_EMPTY)
+                        if valid: # workaround ZZZ
+                            laboratory.append(cell.value)
+                elif units.count(type.value):
+                    valid=(cell.ctype==xlrd.XL_CELL_NUMBER or cell.ctype==xlrd.XL_CELL_EMPTY)
+                elif shortname.value=="COMMENT":
+                    valid=True
+                elif type.value == "UNCMETHOD":
+                    self.cursor.execute(self.sqlValidUncmethod,cell.value)
+                    valid=(self.cursor.fetchall()[0][0]>0 or cell.ctype==xlrd.XL_CELL_EMPTY)    
                 else: 
+                    if not cell.ctype==xlrd.XL_CELL_EMPTY:
+                        print(type.value,shortname.value,cell.value)
                     nonhandeled=nonhandeled+1
                 validvalues.append(valid)
                 row=row+1
@@ -228,6 +256,11 @@ class excelfile:
     def validheader(self):
         valid = len(self.ShortnameStatus) > 0
         valid = valid and not 0 in self.ShortnameStatus
+        return valid
+        
+    def validdata(self):
+        valid = len(self.validvalues) > 0
+        valid = valid and self.validvalues.count(False) == 0
         return valid
         
     def debug(self):
