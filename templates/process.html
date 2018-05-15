@@ -23,7 +23,13 @@
 	<dd>{{ value }}</dd>
   {% endfor %}
 </dl>
-  
+  <h2>Errors on data</h2>
+  <dl>
+  {% for key, value in valueerrors.items() %}
+	<dt>{{ key }} : </dt>
+	<dd>{{ value }}</dd>
+  {% endfor %}
+</d
   {% block footer %}
   {{super()}}
   {% endblock %}

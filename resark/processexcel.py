@@ -5,7 +5,7 @@ import platform
 import hashlib
 import pyodbc 
 import re
-
+import collections
 
 # Valid excel?
 # correct setup for import
@@ -24,6 +24,34 @@ def md5sum(filename, blocksize=65536):
     return hash.hexdigest()
 
 
+ 
+# Function to return Excel column name 
+# for a given column number
+def colname(n):
+    n=n+1 # using 0-based col numbering
+    # To store result (Excel column name)
+    string = []
+    # To store current index in str which is result
+    while n > 0:
+        # Find remainder
+        rem = n % 26
+        # if remainder is 0, then a 
+        # 'Z' must be there in output
+        if rem == 0:
+            string.append('Z')
+            n = int(n / 26) - 1
+        else:
+            string.append(chr((int(rem) - 1) + ord('A')))
+            n = int(n / 26)
+ 
+    # Reverse the string and return result
+    string = string[::-1]
+    return "".join(string)
+
+def tree():
+    return collections.defaultdict(tree)
+    # Makes handling of multidimentional dicts easier
+    
 
 class excelfile:
     def __init__(self,file):
@@ -54,18 +82,24 @@ class excelfile:
         self.nuclide=[]
         self.ShortnameStatus=[]
         self.server="Server=NRPA-3220\\SQLEXPRESS;"
+        self.database="DataArkiv"
         #self.server="Server=databasix2\\databasix2;"
-        connectstring="Driver={SQL Server Native Client 11.0};"+self.server+"Database=DataArkiv;"+"Trusted_Connection=yes;"
+        connectstring="Driver={SQL Server Native Client 11.0};"+self.server+"Database="+self.database+";"+"Trusted_Connection=yes;"
         cnxn = pyodbc.connect(
                       connectstring
                       )
         self.cursor = cnxn.cursor()
+        self.valuewarning=tree()
+        self.valueerror=tree()
+        
         
     def check(self):
         self.ShortnameStatus=[]
         self.checkheader()
         if self.validheader:
             self.checkdata()
+    
+    
     
     
     def checkdata(self):
@@ -75,7 +109,6 @@ class excelfile:
         col=0
         validvalues=[]
         valueerror={}
-        valuewarning={}
         sampletypecol=-1
         parentcol=-1
         parentdata=[]
@@ -86,16 +119,14 @@ class excelfile:
         for row in self.cursor.execute(sql):
             units.append(row[0])
         for shortname,type in zip(self.fields,self.types):
-		# shortname: dataHeader[1,]
-        # type:  dataHeader[2,]
+		# shortname: row 4
+        # type: row 5
             xlcol=list(self.sht.col(col))
-            # print(xlcol)
             del xlcol[:5] # remove five first to get rid of headers
-            # print(xlcol)
-            # print(shortname)
             row=5
             for cell in xlcol:
                 valid=False
+                warning=False
                 if shortname.value=="PARENT_ID":
                     # Anything is valid here, may need it later on for connection
                     parentcol=col
@@ -130,11 +161,23 @@ class excelfile:
                 elif shortname.value == "LONGITUDE":
                     # Valid numbers from -180 to 180 - inclusive
                     valid=(cell.ctype==xlrd.XL_CELL_NUMBER and  cell.value >=-180 and cell.value <=180)
+                elif type.value == "UNCMETHOD" or shortname.value.endswith("_UNCMEASURE"):
+                    self.cursor.execute(self.sqlValidUncmethod,cell.value)
+                    valid=(self.cursor.fetchall()[0][0]>0 or cell.ctype==xlrd.XL_CELL_EMPTY)    
+                    if not valid:
+                        key="Unknown uncertainty definition"
+                        self.addvaluewarning(key,col,row,cell.value)
+                        warning=True
                 elif type.value == "METADATA":
                     # Valid if value for metadata has been seen before
                     # Need a warning for new value, invalid for new key
-                    self.cursor.execute(self.sqlValidMetadata,shortname.value,cell.value)
+                    # print(colname(col),row)
+                    self.cursor.execute(self.sqlValidMetadata,shortname.value,str(cell.value))
                     valid=(self.cursor.fetchall()[0][0]>0 or cell.ctype==xlrd.XL_CELL_EMPTY)
+                    if not valid:
+                        key="Unknown metadatavalue for %s" % shortname.value
+                        self.addvaluewarning(key,col,row,cell.value)
+                        warning=True
                 elif type.value == "LABORATORY":
                     # Valid if laboratory seen before or empty
                     # Todo: Either add index on laboratory (need to change the col to varchar(100)) 
@@ -144,37 +187,44 @@ class excelfile:
                         valid=(self.cursor.fetchall()[0][0]>0 or cell.ctype==xlrd.XL_CELL_EMPTY)
                         if valid: # workaround ZZZ
                             laboratory.append(cell.value)
-                elif units.count(type.value):
+                elif units.count(type.value): # This is a number
                     valid=(cell.ctype==xlrd.XL_CELL_NUMBER or cell.ctype==xlrd.XL_CELL_EMPTY)
                 elif shortname.value=="COMMENT":
                     valid=True
-                elif type.value == "UNCMETHOD":
-                    
-                    self.cursor.execute(self.sqlValidUncmethod,cell.value)
-                    valid=(self.cursor.fetchall()[0][0]>0 or cell.ctype==xlrd.XL_CELL_EMPTY)    
-                    if not valid:
-                        key="Unknown uncertainty definition"
-                        
-                        cellid=str(col)+"-"+str(row)+" ("+cell.value+")"
-                        #if valuewarning.has_key(key):
-                        if key in valuewarning:
-                            valuewarning[key].append(cellid)
-                        else:
-                            valuewarning[key]=[cellid]
-                      
                 else: 
                     if not cell.ctype==xlrd.XL_CELL_EMPTY:
                         print(type.value,shortname.value,cell.value)
+                        message="Unhandeled data"
+                        self.addvalueerror(message,col,row,cell.value)
                     nonhandeled=nonhandeled+1
                 validvalues.append(valid)
+                if (not valid) and (not warning):
+                    print(colname(col)+str(row))
                 row=row+1
             # print(col,sampletypecol)
             col = col +1
         self.validvalues=validvalues
         self.nonhandeled=nonhandeled
-        self.valuewarning=valuewarning
+        
+    def addvalueerror(self,key,col,row,value):
+        cellid=colname(col)+str(row+1)
+        if self.valueerror[key][value]=={}:
+            self.valueerror[key][value]=[cellid]
+        else:
+            self.valueerror[key][value].append(cellid)
         
         
+        
+    def addvaluewarning(self,key,col,row,value):
+        # using zero-based row numbers
+        cellid=colname(col)+str(row+1)
+        if self.valuewarning[key][value]=={}:
+            self.valuewarning[key][value]=[cellid]
+        else:
+            self.valuewarning[key][value].append(cellid)
+         
+         
+         
     def checkheader(self):
         self.md5=md5sum(self.file)
         wb = open_workbook(self.file)
@@ -194,10 +244,6 @@ class excelfile:
             raise ValueError(self.ExpectedBlank)
         self.fields=self.sht.row(3) 
         self.types=self.sht.row(4)
-        # sql="select shortname,attrtype,datatype,name from validData where not shortname is null"
-        # self.cursor.execute(sql)
-        # validData=self.cursor.fetchall()
-        # Count validated rows
         self.ShortnameStatus=[]
         ## Regular expression for checking for valid nuclide format
         regexpnuc='^[A-Z]{1,2}([0-9]{1,3}m{0,1}){0,1}(\\_{0,1}[0-9]{0,3}){0,1}(\\#{0,1}[0-9]{0,9}){0,1}$'
@@ -285,8 +331,10 @@ class excelfile:
         print("False:",self.validvalues.count(False))
         print("Nonhandeled:",self.nonhandeled)
         print(self.valuewarning)
+        print(self.valueerror)
           
 if __name__ == '__main__':
-    test=excelfile('test.xlsx')
+    
+    test=excelfile('RAME Komsomolets.xlsx')
     test.check()
     test.debug()
