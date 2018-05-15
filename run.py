@@ -34,8 +34,8 @@ app.jinja_env.filters['datetimefilter'] = datetimefilter
 
 @app.route("/")
 def template_test():
-    return render_template('template.html', my_string="Wheeeee!", 
-        my_list=[0,1,2,3,4,5], title="Index", current_time=datetime.datetime.now())
+    return render_template('template.html', my_string="Strålevernets resultatarkiv", 
+        my_list=[], title="Resultatarkiv", current_time=datetime.datetime.now())
 
 @app.route("/home")
 def home():
@@ -51,8 +51,8 @@ def upload():
             file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
             return redirect(url_for('index'))
   
-    return render_template('upload.html', my_string="Foo", 
-        my_list=[6,7,8,9,10,11], title="Upload excel file", current_time=datetime.datetime.now())
+    return render_template('upload.html',  
+        title="Upload excel file")
 
 @app.route("/process", methods=['GET', 'POST'] )
 def process():

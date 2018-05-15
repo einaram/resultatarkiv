@@ -18,16 +18,26 @@
   <p>Valid data: {{okdata}}</p>
   <h2>Warnings on data</h2>
   <dl>
-  {% for key, value in valuewarnings.items() %}
-	<dt>{{ key }} : </dt>
-	<dd>{{ value }}</dd>
+  <table>
+  {% for key, hash in valuewarnings.items() %}
+	<tr><th colspan="2">{{ key }}</th></tr> </dt>
+	{% for key, value in hash.items() %}
+     <tr><td style="white-space: nowrap;">{{ key }}</td><td>
+     {% for cell  in value %}
+     {{ cell }} 
+     {%endfor %}
+     </td></tr>
+    {% endfor %}
   {% endfor %}
+  </table>
 </dl>
   <h2>Errors on data</h2>
   <dl>
-  {% for key, value in valueerrors.items() %}
+  {% for key, hash in valueerrors.items() %}
 	<dt>{{ key }} : </dt>
-	<dd>{{ value }}</dd>
+	{% for key, value in hash.items() %}
+        <dd>{{ key }},{{ value }}</dd>
+    {% endfor %}
   {% endfor %}
 </d
   {% block footer %}

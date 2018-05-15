@@ -63,6 +63,7 @@ class excelfile:
         self.InvalidNuclide = "Nuclide '%s', column %i,  is not recognised as valid. Is it registered in the database?"
         self.HeaderNonValidNuclide = "Header '%s' does not proceed a valid inital column of this nuclide, a column without any _* postfix. Last registered nuclide is '%s'."
         self.InvalidProjectid = "Project %s is not defined"
+        self.InvalidValue = "%s has an invalid value"
         self.OkHeader = "Header '%s' with unit %s is OK"
         self.InvalidArea = "Header '%s', column %i, has a wrong unit %s. Unit should be one of %s"
         self.ShortSummaryWrong = "Summary: %i headers were read, %i were ok and %i had errors. Please revise based on given messages."
@@ -72,13 +73,16 @@ class excelfile:
         self.ShortSummaryValidation = "Checked data in %i columns. %i are OK, and %i are not ok and should be checked based on error messages above."
         self.ExpectedBlank = "Forventet blank (%s)"
         self.invalidColOrder = "%s må komme før %s"
-        
+        self.invalidDate="Invalid date"
+        self.warningEmpty="%s has no data"
         self.sqlValidNoNuc="select count(shortname) from validData where shortname=? and attrtype!='NUCLIDE'"
         self.sqlValidGetParam="select count(shortname) from validData where shortname=? and attrtype=?"
         self.sqlValidSubtype="select count(stl.id) from samplesubtypelist sstl left join sampletypelist stl on stl.id=sampletypelistid where stl.shortname=? and sstl.name =?"    
         self.sqlValidMetadata="select count(smd.id) from samplemetadata smd left join metadatalist md on smd.metadataid=md.id where md.shortname=? and smd.value=?"
         self.sqlValidLaboratory="select count(id) from samplevalue where laboratory = ?"
         self.sqlValidUncmethod="select count(id) from samplevalue where uncmeasure = ?"
+        self.sqlValidSpecies="select count(sp.id) from specieslist sp left join sampletypelist st on sp.sampletypeid = st.id where sp.id=? and st.shortname=?"
+        
         self.nuclide=[]
         self.ShortnameStatus=[]
         self.server="Server=NRPA-3220\\SQLEXPRESS;"
@@ -137,30 +141,45 @@ class excelfile:
                     valid=True
                 elif shortname.value=="CONNECT_TO_PARENT":
                     # Should have a valid parent_id
-                    if len(parentdata)==0:
-                        raise ValueError(invalidColOrder)
-                    valid=(parentdata.count(cell.value)>0 or cell.ctype==xlrd.XL_CELL_EMPTY)
+                    if cell.ctype==xlrd.XL_CELL_EMPTY:
+                        valid=True
+                    else:
+                        if len(parentdata)==0:
+                            raise ValueError(self.invalidColOrder)
+                        valid=(parentdata.count(cell.value)>0 or cell.ctype==xlrd.XL_CELL_EMPTY)
                 elif shortname.value=="SAMPLETYPE":
                     # Valid if sampletype is defined
                     sampletypecol=col
                     self.cursor.execute(self.sqlValidGetParam,cell.value, "SAMPLETYPE")
-                    valid=self.cursor.fetchall()[0][0]
+                    valid=self.cursor.fetchall()[0][0]>0
                 elif shortname.value=="SAMPLESUBTYPE":
                     # Valid if subtype is defined and correct for sampletype
                     if sampletypecol < 0:
                         raise ValueError(invalidColOrder % ('Sampletype','Subtype'))
                     sampletype=self.sht.cell_value(row,sampletypecol)
                     self.cursor.execute(self.sqlValidSubtype,sampletype,cell.value)
-                    valid=self.cursor.fetchall()[0][0]
+                    valid=cell.ctype==xlrd.XL_CELL_EMPTY or self.cursor.fetchall()[0][0]>0
                 elif shortname.value=="REF_DATE":
                     # Any date is valid
                     valid=cell.ctype==xlrd.XL_CELL_DATE
+                    if not valid:
+                        addvalueerror(invalidDate,col,row,cell.value)
                 elif shortname.value == "LATITUDE":
                     # Valid numbers from -90 to 90- inclusive
-                    valid=(cell.ctype==xlrd.XL_CELL_NUMBER and  cell.value >=-90 and cell.value <=90)
+                    if cell.ctype==xlrd.XL_CELL_EMPTY:
+                        self.addvaluewarning(self.warningEmpty% "LATITUDE",col,row,"No data")
+                    else:
+                        valid=(cell.ctype==xlrd.XL_CELL_NUMBER and  cell.value >=-90 and cell.value <=90)
+                        if not valid:
+                            self.addvalueerror(self.invalidValue % shortname.value,col,row,cell.value)
                 elif shortname.value == "LONGITUDE":
+                    if cell.ctype==xlrd.XL_CELL_EMPTY:
+                        self.addvaluewarning(self.warningEmpty% shortname.value,col,row,"No data")
+                    else:
                     # Valid numbers from -180 to 180 - inclusive
-                    valid=(cell.ctype==xlrd.XL_CELL_NUMBER and  cell.value >=-180 and cell.value <=180)
+                        valid=(cell.ctype==xlrd.XL_CELL_EMPTY) or (cell.ctype==xlrd.XL_CELL_NUMBER and  cell.value >=-180 and cell.value <=180)
+                        if not valid:
+                            self.addvalueerror("Invalid value for %s" % cell.value,col,row,cell.value)
                 elif type.value == "UNCMETHOD" or shortname.value.endswith("_UNCMEASURE"):
                     self.cursor.execute(self.sqlValidUncmethod,cell.value)
                     valid=(self.cursor.fetchall()[0][0]>0 or cell.ctype==xlrd.XL_CELL_EMPTY)    
@@ -175,9 +194,19 @@ class excelfile:
                     self.cursor.execute(self.sqlValidMetadata,shortname.value,str(cell.value))
                     valid=(self.cursor.fetchall()[0][0]>0 or cell.ctype==xlrd.XL_CELL_EMPTY)
                     if not valid:
-                        key="Unknown metadatavalue for %s" % shortname.value
-                        self.addvaluewarning(key,col,row,cell.value)
-                        warning=True
+                        if cell.ctype==xlrd.XL_CELL_NUMBER:
+                            value=int(cell.value)
+                            self.cursor.execute(self.sqlValidMetadata,shortname.value,str(value))
+                            valid=(self.cursor.fetchall()[0][0]>0 or cell.ctype==xlrd.XL_CELL_EMPTY)
+                        if not valid:
+                            key="Unknown metadatavalue for %s" % shortname.value
+                            self.addvaluewarning(key,col,row,cell.value)
+                            warning=True
+                elif shortname.value == "SPECIESID":
+                    sampletype=self.sht.cell_value(row,sampletypecol)
+                    self.cursor.execute(self.sqlValidSpecies,cell.value,sampletype)
+                    valid=(self.cursor.fetchall()[0][0]>0 or cell.ctype==xlrd.XL_CELL_EMPTY)
+                    
                 elif type.value == "LABORATORY":
                     # Valid if laboratory seen before or empty
                     # Todo: Either add index on laboratory (need to change the col to varchar(100)) 
@@ -199,7 +228,7 @@ class excelfile:
                     nonhandeled=nonhandeled+1
                 validvalues.append(valid)
                 if (not valid) and (not warning):
-                    print(colname(col)+str(row))
+                    print(colname(col)+str(row+1))
                 row=row+1
             # print(col,sampletypecol)
             col = col +1
@@ -334,7 +363,8 @@ class excelfile:
         print(self.valueerror)
           
 if __name__ == '__main__':
-    
-    test=excelfile('RAME Komsomolets.xlsx')
+    file="RAME kyststasjoner.xlsx"
+    dir="..\\testdata\\"
+    test=excelfile(dir+file)
     test.check()
     test.debug()
