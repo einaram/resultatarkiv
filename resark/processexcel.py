@@ -151,7 +151,7 @@ class excelfile:
                     # Valid if sampletype is defined
                     sampletypecol=col
                     self.cursor.execute(self.sqlValidGetParam,cell.value, "SAMPLETYPE")
-                    valid=self.cursor.fetchall()[0][0]>0
+                    valid=(self.cursor.fetchall()[0][0]>0 and cell.ctype != xlrd.XL_CELL_EMPTY)
                 elif shortname.value=="SAMPLESUBTYPE":
                     # Valid if subtype is defined and correct for sampletype
                     if sampletypecol < 0:
@@ -209,7 +209,7 @@ class excelfile:
                     
                 elif type.value == "LABORATORY":
                     # Valid if laboratory seen before or empty
-                    # Todo: Either add index on laboratory (need to change the col to varchar(100)) 
+                    # Todo: Either add index on laboratory (need to change the col to varchar(100))  
                     valid=(laboratory.count(cell.value)>0) # workaround ZZZ
                     if not valid: # workaround ZZZ
                         self.cursor.execute(self.sqlValidLaboratory,cell.value)
@@ -225,14 +225,12 @@ class excelfile:
                         print(type.value,shortname.value,cell.value)
                         message="Unhandeled data"
                         self.addvalueerror(message,col,row,cell.value)
-                    nonhandeled=nonhandeled+1
-                validvalues.append(valid)
+                    nonhandeled=nonhandeled+1 
                 if (not valid) and (not warning):
                     print(colname(col)+str(row+1))
                 row=row+1
-            # print(col,sampletypecol)
+            # print(col,sampletypecol) 
             col = col +1
-        self.validvalues=validvalues
         self.nonhandeled=nonhandeled
         
     def addvalueerror(self,key,col,row,value):
@@ -242,8 +240,7 @@ class excelfile:
         else:
             self.valueerror[key][value].append(cellid)
         
-        
-        
+       
     def addvaluewarning(self,key,col,row,value):
         # using zero-based row numbers
         cellid=colname(col)+str(row+1)

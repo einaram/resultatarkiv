@@ -15,23 +15,29 @@
   <hr />
   <p>Processing uploaded file...</p>
   <p>Valid header: {{okheader}}</p>
-  <p>Valid data: {{okdata}}</p>
+   <form action="/importdata" method="post" enctype="multipart/form-data">
+      <input type="hidden" name="file" value="filename">
+         <input type="submit" id="importdata" value="Import data">
+    </form>
+ 
+  
+  {% if valuewarnings|length >0 %}
   <h2>Warnings on data</h2>
-  <dl>
-  <table>
-  {% for key, hash in valuewarnings.items() %}
-	<tr><th colspan="2">{{ key }}</th></tr> </dt>
-	{% for key, value in hash.items() %}
-     <tr><td style="white-space: nowrap;">{{ key }}</td><td>
-     {% for cell  in value %}
-     {{ cell }} 
-     {%endfor %}
-     </td></tr>
-    {% endfor %}
-  {% endfor %}
-  </table>
-</dl>
+  <p>Check warnings that should be ignored.</p>
+  <table>{% for key, hash in valuewarnings.items() %}
+	<tr><th colspan="2">{{ key }}</th></tr> </dt>{% for key, value in hash.items() %}
+	 <tr><td style="white-space: nowrap;"><input type="checkbox" id="{{ key }}" /> {{ key }} </td>
+     <td>{% for cell  in value %}{{ cell }} {%endfor %}</td>
+     </tr>{% endfor %}
+  {% endfor %}</table>
+  {% endif %}
+  
+  {% if valueerrors|length >0 %}
+  <script>
+  document.getElementById("importdata").disabled = true;
+  </script>
   <h2>Errors on data</h2>
+  <p>If there are any errors, they need to be corrected externally and the data sheet must be re-uploaded.</p>
   <dl>
   {% for key, hash in valueerrors.items() %}
 	<dt>{{ key }} : </dt>
@@ -39,7 +45,8 @@
         <dd>{{ key }},{{ value }}</dd>
     {% endfor %}
   {% endfor %}
-</d
+    </dl>
+   {% endif %}
   {% block footer %}
   {{super()}}
   {% endblock %}

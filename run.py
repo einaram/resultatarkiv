@@ -66,7 +66,7 @@ def process():
             importfile.check()
     return render_template('process.html', my_string= request.files['file'].filename, 
         title="Processing file", current_time=datetime.datetime.now(),okheader=importfile.validheader(),
-        okdata=importfile.validdata(),valuewarnings=importfile.valuewarning,valueerrors=importfile.valueerror,md5=importfile.md5)
+        valuewarnings=importfile.valuewarning,valueerrors=importfile.valueerror,md5=importfile.md5)
 
 
 @app.route("/about")
