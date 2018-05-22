@@ -191,7 +191,7 @@ class excelfile:
                     valid=cell.ctype==xlrd.XL_CELL_DATE
                     if not valid:
                         try:
-                            datetime.datetime.strptime(cell.value,"%Y-%m-%d %h:%m:%s")
+                            datetime.datetime.strptime(cell.value,"%Y-%m-%d %H:%M:%S")
                             valid=True # Will be trown out if parsing does not work
                         except ValueError:
                             valid=False
@@ -276,8 +276,7 @@ class excelfile:
                 row=row+1
             # print(col,sampletypecol) 
             elaps=time.time()-starttime
-            if(elaps)>0.001:
-                print("Kolonne:",colname(col)," ",shortname.value," ",s2.value," tid:",elaps)
+            print("Kolonne:",colname(col)," ",shortname.value," ",s2.value," tid:",elaps)
             col = col +1
         self.nonhandeled=nonhandeled
         

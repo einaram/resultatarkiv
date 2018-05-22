@@ -1,0 +1,16 @@
+{% extends "layout.html" %}
+{% block title %}{{title}}{% endblock %}
+{% block head %}
+  {{ super() }}
+{% endblock %}
+{% block page %}{{title}}{% endblock %}
+{% block heading %}
+  {{ super() }}
+{% endblock %}
+{% block content %}
+  <p>Noe gikk galt...</p>
+  <p><a href="/">Returner til hovedsiden</a></p> 
+  {% block footer %}
+  {{super()}}
+  {% endblock %}
+{% endblock %}

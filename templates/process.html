@@ -44,7 +44,7 @@
   <p>If there are any errors, they need to be corrected externally and the data sheet must be re-uploaded.</p>
    <table>{% for key, hash in valueerrors.items() %}
 	<tr><th colspan="2">{{ key }}</th></tr> </dt>{% for key, value in hash.items() %}
-	 <tr><td style="white-space: nowrap;"><input type="checkbox" id="{{ key }}" /> {{ key }} </td>
+	 <tr><td style="white-space: nowrap;">{{ key }} </td>
      <td>{% for cell  in value %}{{ cell }} {%endfor %}</td>
      </tr>{% endfor %}
   {% endfor %}</table> {% endif %}
