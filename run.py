@@ -68,17 +68,24 @@ def process():
         title="Processing file", current_time=datetime.datetime.now(),okheader=importfile.validheader(),
         valuewarnings=importfile.valuewarning,valueerrors=importfile.valueerror,md5=importfile.md5)
 
+@app.route("/importdata", methods=['POST'] )
+def importdata():
+    return render_template('importdata.html', title="Importerer data")
 
+        
 @app.route("/about")
 def about():
-    return render_template('about.html', my_string="Bar", 
-        my_list=[12,13,14,15,16,17], title="About", current_time=datetime.datetime.now())
+    return render_template('about.html', title="About")
 
 @app.route("/contact")
 def contact():
     return render_template('template.html', my_string="FooBar"
         , my_list=[18,19,20,21,22,23], title="Contact Us", current_time=datetime.datetime.now())
 
+@app.errorhandler(404)
+def page_not_found(e):
+    return render_template('htmlerror.html'), 404
+        
 
 if __name__ == '__main__':
     app.run(debug=True)
