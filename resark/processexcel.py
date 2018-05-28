@@ -82,8 +82,9 @@ class excelfile:
         self.ShortSummaryValidation = "Checked data in %i columns. %i are OK, and %i are not ok and should be checked based on error messages above."
         self.ExpectedBlank = "Forventet blank (%s)"
         self.invalidColOrder = "%s må komme før %s"
-        self.invalidDate="Invalid date"
+        self.invalidDate="Feil dato - må være åååå.mm.dd evt med tt:mm:ss"
         self.warningEmpty="%s has no data"
+        self.errorUnhandeled="Ikke-håndterte data, sjekk at headere er riktige"
         
         self.sqlValidNoNuc="select count(shortname) from validData where shortname=? and attrtype!='NUCLIDE'"
         self.sqlValidGetParam="select count(shortname) from validData where shortname=? and attrtype=?"
@@ -110,7 +111,7 @@ class excelfile:
         self.SEENBEFORE=1
         self.headerRows=5
         self.lookup=tree()
-        
+        self.dateFormat=None
         
     def check(self):
         self.ShortnameStatus=[]
@@ -143,7 +144,7 @@ class excelfile:
         nonhandeled=0
         laboratory=[] # Workaround until database is updated with index on laboratory search ZZZ
         units=[]
-        allowNewValues=["SAMPLEID"] # Will accept new values for metadata
+        allowNewValues=["SAMPLEID","LIMSNR"] # Will accept new values for metadata
         
         sql="select shortname from unitlist"
         for row in self.cursor.execute(sql):
@@ -160,7 +161,9 @@ class excelfile:
             for cell in xlcol:
                 valid=False
                 warning=False
-                if shortname.value=="PARENT_ID":
+                if type.value=="VALUE":
+                    valid= cell.ctype in [xlrd.XL_CELL_EMPTY,xlrd.XL_CELL_NUMBER]
+                elif shortname.value=="PARENT_ID":
                     # Anything is valid here, may need it later on for connection
                     parentcol=col
                     if len(parentdata)==0:
@@ -176,19 +179,24 @@ class excelfile:
                         if len(parentdata)==0:
                             raise ValueError(self.invalidColOrder)
                         valid=(parentdata.count(cell.value)>0 or cell.ctype==xlrd.XL_CELL_EMPTY)
-                elif shortname.value == "AREAID":
+                elif type.value == "AREAID":
                     seen=False
                     value=cell.value
-                   # print(cellname(col,row))
                     if cell.ctype==xlrd.XL_CELL_NUMBER:
                         value=str(int(value))
+                    if shortname.value=="KOMMUNE":
+                        if len(value)==3:
+                            value="0"+value
                     if value in lookup[shortname.value][type.value]:
                         valid=(lookup[shortname.value][type.value][value]==1) or (cell.ctype==xlrd.XL_CELL_EMPTY)
                         seen=True
-                    valid = cell.ctype == xlrd.XL_CELL_EMPTY
+                    valid = valid or cell.ctype == xlrd.XL_CELL_EMPTY
                     if not (seen or valid):
-                        self.cursor.execute(self.sqlValidAreaId,type.value,str(int(value)))
-                        valid=(self.cursor.fetchall()[0][0]>0 or cell.ctype==xlrd.XL_CELL_EMPTY)
+                        self.cursor.execute(self.sqlValidAreaId,shortname.value,value)
+                        print("SQL:"+value)
+                        res=self.cursor.fetchall()[0][0]
+                        print(res)
+                        valid=(res>0 or cell.ctype==xlrd.XL_CELL_EMPTY)
                         if not valid:
                             key="Unknown metadatavalue for %s" % shortname.value
                             warning=True
@@ -197,7 +205,7 @@ class excelfile:
                             lookup[shortname.value][type.value][value]=1
                     if not valid:
                         key="Unknown metadatavalue for %s" % shortname.value
-                        self.addvaluewarning(key,col,row,cell.value)
+                        self.addvaluewarning(key,col,row,value)
                         warning=True
                     
                 elif shortname.value=="SAMPLETYPE":
@@ -217,12 +225,28 @@ class excelfile:
                     sampletype=self.sht.cell_value(row,sampletypecol)
                     self.cursor.execute(self.sqlValidSubtype,sampletype,cell.value)
                     valid=cell.ctype==xlrd.XL_CELL_EMPTY or self.cursor.fetchall()[0][0]>0
-                elif shortname.value=="REF_DATE":
+                elif shortname.value=="REF_DATE" or shortname.value=="SAMPLE_DATE":
                     # Any date is valid
                     valid=cell.ctype==xlrd.XL_CELL_DATE
                     if not valid:
+                        dateparts=list(filter(None, re.split(r'(\d+)',cell.value)))
                         try:
-                            datetime.datetime.strptime(cell.value,"%Y-%m-%d %H:%M:%S")
+                            if(self.dateFormat==None):
+                                if len(dateparts)<5 or len(dateparts) > 11:
+                                    raise ValueError(self.invalidDate)
+                                dsep=dateparts[1]
+                                if len(dateparts[0])==4:
+                                    self.dateFormat="%Y"+dsep+"%m"+dsep+"%d"
+                                if len(dateparts[4])==4:
+                                    self.dateFormat="%d"+dsep+"%m"+dsep+"%Y"
+                                if self.dateFormat==None:
+                                    raise ValueError(self.invalidDate)
+                                if len(dateparts) >5:
+                                    hsep=dateparts[7]
+                                    self.dateFormat=self.dateFormat+dateparts[5]+"%H"+hsep+"%M"
+                                if len(dateparts) >9:
+                                    self.dateFormat=self.dateFormat+hsep+"%S"
+                            datetime.datetime.strptime(cell.value,self.dateFormat)
                             valid=True # Will be trown out if parsing does not work
                         except ValueError:
                             valid=False
@@ -269,6 +293,8 @@ class excelfile:
                             lookup["INSTRUMENT"][shortname.value][cell.value]=1
                 elif shortname.value == "WEEKNR":
                     valid = cell.ctype==xlrd.XL_CELL_EMPTY or (cell.ctype==xlrd.XL_CELL_NUMBER  and cell.value > 0 and cell.value < 54)
+                elif type.value == "METADATA" and shortname.value in allowNewValues:
+                    valid=True
                 elif type.value == "METADATA":
                     # Valid if value for metadata has been seen before
                     # Need a warning for new value, invalid for new key
@@ -277,7 +303,6 @@ class excelfile:
                     value=cell.value
                     if value in lookup["METADATA"][shortname.value]:
                         valid=lookup["METADATA"][shortname.value][value]==1
-                        valid = valid or (allowNewValues.count(shortname.value)>0) 
                         seen=True
                     if not seen:
                         self.cursor.execute(self.sqlValidMetadata,shortname.value,str(value))
@@ -316,11 +341,12 @@ class excelfile:
                     valid=(cell.ctype==xlrd.XL_CELL_NUMBER or cell.ctype==xlrd.XL_CELL_EMPTY)
                 elif shortname.value=="COMMENT":
                     valid=True
+                elif shortname.value=="COMMENTS":
+                    valid=True
                 else: 
                     if not cell.ctype==xlrd.XL_CELL_EMPTY:
                        # print(type.value,shortname.value,cell.value)
-                        message="Unhandeled data"
-                        self.addvalueerror(message,col,row,cell.value)
+                       self.addvalueerror(self.errorUnhandeled,col,row,cell.value)
                     nonhandeled=nonhandeled+1 
                 if (not valid) and (not warning):
                    False
