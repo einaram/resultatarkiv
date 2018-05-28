@@ -52,6 +52,11 @@ def colname(n):
     string = string[::-1]
     return "".join(string)
 
+def cellname(col,row):
+    c=colname(col)
+    r=str(row)
+    return(c+r)
+    
 def tree():
     return collections.defaultdict(tree)
     # Makes handling of multidimentional dicts easier
@@ -67,7 +72,7 @@ class excelfile:
         self.InvalidNuclide = "Nuclide '%s', column %i,  is not recognised as valid. Is it registered in the database?"
         self.HeaderNonValidNuclide = "Header '%s' does not proceed a valid inital column of this nuclide, a column without any _* postfix. Last registered nuclide is '%s'."
         self.InvalidProjectid = "Project %s is not defined"
-        self.InvalidValue = "%s has an invalid value"
+        self.invalidValue = "%s has an invalid value"
         self.OkHeader = "Header '%s' with unit %s is OK"
         self.InvalidArea = "Header '%s', column %i, has a wrong unit %s. Unit should be one of %s"
         self.ShortSummaryWrong = "Summary: %i headers were read, %i were ok and %i had errors. Please revise based on given messages."
@@ -79,14 +84,17 @@ class excelfile:
         self.invalidColOrder = "%s må komme før %s"
         self.invalidDate="Invalid date"
         self.warningEmpty="%s has no data"
+        
         self.sqlValidNoNuc="select count(shortname) from validData where shortname=? and attrtype!='NUCLIDE'"
         self.sqlValidGetParam="select count(shortname) from validData where shortname=? and attrtype=?"
         self.sqlValidSubtype="select count(stl.id) from samplesubtypelist sstl left join sampletypelist stl on stl.id=sampletypelistid where stl.shortname=? and sstl.name =?"    
         self.sqlValidMetadata="select count(smd.id) from samplemetadata smd left join metadatalist md on smd.metadataid=md.id where md.shortname=? and smd.value=?"
         self.sqlValidLaboratory="select count(id) from samplevalue where laboratory = ?"
         self.sqlValidUncmethod="select count(id) from samplevalue where uncmeasure = ?"
+        self.sqlValidInstrument="select count(id) from samplevalue where instrument = ?"
         self.sqlValidSpecies="select count(sp.id) from specieslist sp left join sampletypelist st on sp.sampletypeid = st.id where sp.id=? and st.shortname=?"
         self.sqlValidAreaId="select count(areaid) from GeoAreas where objtype=? and areaid=?"
+        
         self.nuclide=[]
         self.ShortnameStatus=[]
         self.server="Server=NRPA-3220\\SQLEXPRESS;"
@@ -100,6 +108,9 @@ class excelfile:
         self.valuewarning=tree()
         self.valueerror=tree()
         self.SEENBEFORE=1
+        self.headerRows=5
+        self.lookup=tree()
+        
         
     def check(self):
         self.ShortnameStatus=[]
@@ -107,8 +118,17 @@ class excelfile:
         if self.validheader:
             self.checkdata()
     
-    
-    
+    def checkItemEmptyOK(self,type,shortname,cell,sql,col,row,message):
+        valid=self.lookup[type][shortname][cell.value]==1
+        if not valid:
+            self.cursor.execute(self.sqlValidUncmethod,cell.value)
+            valid=(self.cursor.fetchall()[0][0]>0 or cell.ctype==xlrd.XL_CELL_EMPTY)    
+            if not valid:
+                self.addvaluewarning(message,col,row,cell.value)
+                warning=True
+            else:
+                self.lookup[type][shortname][cell.value]=1
+
     
     def checkdata(self):
         if len(self.ShortnameStatus)==0:
@@ -124,6 +144,7 @@ class excelfile:
         laboratory=[] # Workaround until database is updated with index on laboratory search ZZZ
         units=[]
         allowNewValues=["SAMPLEID"] # Will accept new values for metadata
+        
         sql="select shortname from unitlist"
         for row in self.cursor.execute(sql):
             units.append(row[0])
@@ -133,8 +154,7 @@ class excelfile:
         # type: row 5
             starttime=time.time()
             xlcol=list(self.sht.col(col))
-            s2=xlcol[4]
-            del xlcol[:5] # remove five first to get rid of headers
+            del xlcol[:self.headerRows] # remove five first to get rid of headers
             row=5
             doneOnce=False
             for cell in xlcol:
@@ -157,28 +177,39 @@ class excelfile:
                             raise ValueError(self.invalidColOrder)
                         valid=(parentdata.count(cell.value)>0 or cell.ctype==xlrd.XL_CELL_EMPTY)
                 elif shortname.value == "AREAID":
+                    seen=False
                     value=cell.value
-                    valid=lookup["AREAID"][type.value][value]==1
-                    if not valid:
+                   # print(cellname(col,row))
+                    if cell.ctype==xlrd.XL_CELL_NUMBER:
+                        value=str(int(value))
+                    if value in lookup[shortname.value][type.value]:
+                        valid=(lookup[shortname.value][type.value][value]==1) or (cell.ctype==xlrd.XL_CELL_EMPTY)
+                        seen=True
+                    valid = cell.ctype == xlrd.XL_CELL_EMPTY
+                    if not (seen or valid):
                         self.cursor.execute(self.sqlValidAreaId,type.value,str(int(value)))
                         valid=(self.cursor.fetchall()[0][0]>0 or cell.ctype==xlrd.XL_CELL_EMPTY)
                         if not valid:
-                            if cell.ctype==xlrd.XL_CELL_NUMBER:
-                                value=int(value)
-                                self.cursor.execute(self.sqlValidMetadata,shortname.value,str(value))
-                                valid=(self.cursor.fetchall()[0][0]>0 or cell.ctype==xlrd.XL_CELL_EMPTY)
-                            if not valid:
-                                key="Unknown metadatavalue for %s" % shortname.value
-                                self.addvaluewarning(key,col,row,cell.value)
-                                warning=True
+                            key="Unknown metadatavalue for %s" % shortname.value
+                            warning=True
+                            lookup[shortname.value][type.value][value]=-1
                         else:
-                            lookup["AREAID"][type.value][value]=1
-                    valid=True
+                            lookup[shortname.value][type.value][value]=1
+                    if not valid:
+                        key="Unknown metadatavalue for %s" % shortname.value
+                        self.addvaluewarning(key,col,row,cell.value)
+                        warning=True
+                    
                 elif shortname.value=="SAMPLETYPE":
                     # Valid if sampletype is defined
-                    sampletypecol=col
-                    self.cursor.execute(self.sqlValidGetParam,cell.value, "SAMPLETYPE")
-                    valid=(self.cursor.fetchall()[0][0]>0 and cell.ctype != xlrd.XL_CELL_EMPTY)
+                    sampletypecol=col # Possible need to look up from subtype or species
+                    value=cell.value
+                    valid=(lookup[shortname.value][type.value][value]==1)
+                    if not valid:
+                        self.cursor.execute(self.sqlValidGetParam,cell.value, shortname.value)
+                        valid=(self.cursor.fetchall()[0][0]>0 and cell.ctype != xlrd.XL_CELL_EMPTY)
+                        if valid:
+                            lookup[shortname.value][type.value][value]=1
                 elif shortname.value=="SAMPLESUBTYPE":
                     # Valid if subtype is defined and correct for sampletype
                     if sampletypecol < 0:
@@ -213,6 +244,8 @@ class excelfile:
                         if not valid:
                             self.addvalueerror("Invalid value for %s" % cell.value,col,row,cell.value)
                 elif type.value == "UNCMETHOD" or shortname.value.endswith("_UNCMEASURE"):
+                    self.checkItemEmptyOK(type.value,shortname.value,cell,self.sqlValidUncmethod,col,row,"Unknown uncertainty definition")
+                elif type.value == "UNCMETHOD0" or shortname.value.endswith("_UNCMEASURE0"):
                     valid=lookup["UNCMETHOD"][shortname.value][cell.value]==1
                     if not valid:
                         self.cursor.execute(self.sqlValidUncmethod,cell.value)
@@ -223,30 +256,49 @@ class excelfile:
                             warning=True
                         else:
                             lookup["UNCMETHOD"][shortname.value][cell.value]=1
+                elif type.value == "INSTRUMENT" or shortname.value.endswith("_INSTRUMENT"):
+                    valid=lookup["INSTRUMENT"][shortname.value][cell.value]==1
+                    if not valid:
+                        self.cursor.execute(self.sqlValidInstrument,cell.value)
+                        valid=(self.cursor.fetchall()[0][0]>0 or cell.ctype==xlrd.XL_CELL_EMPTY)    
+                        if not valid:
+                            key="Unknown uncertainty definition"
+                            self.addvaluewarning(key,col,row,cell.value)
+                            warning=True
+                        else:
+                            lookup["INSTRUMENT"][shortname.value][cell.value]=1
+                elif shortname.value == "WEEKNR":
+                    valid = cell.ctype==xlrd.XL_CELL_EMPTY or (cell.ctype==xlrd.XL_CELL_NUMBER  and cell.value > 0 and cell.value < 54)
                 elif type.value == "METADATA":
                     # Valid if value for metadata has been seen before
                     # Need a warning for new value, invalid for new key
                     # print(colname(col),row)
+                    seen=False
                     value=cell.value
-                    valid=lookup["METADATA"][shortname.value][value]==1
-                    valid = valid or (allowNewValues.count(shortname.value)>0) 
-                    if not valid:
+                    if value in lookup["METADATA"][shortname.value]:
+                        valid=lookup["METADATA"][shortname.value][value]==1
+                        valid = valid or (allowNewValues.count(shortname.value)>0) 
+                        seen=True
+                    if not seen:
                         self.cursor.execute(self.sqlValidMetadata,shortname.value,str(value))
-                        valid=(self.cursor.fetchall()[0][0]>0 or cell.ctype==xlrd.XL_CELL_EMPTY)
+                        valid=(cell.ctype==xlrd.XL_CELL_EMPTY or self.cursor.fetchall()[0][0]>0)
                         if not valid:
                             if cell.ctype==xlrd.XL_CELL_NUMBER:
                                 value=int(value)
                                 self.cursor.execute(self.sqlValidMetadata,shortname.value,str(value))
                                 valid=(self.cursor.fetchall()[0][0]>0 or cell.ctype==xlrd.XL_CELL_EMPTY)
-                            if not valid:
-                                key="Unknown metadatavalue for %s" % shortname.value
-                                self.addvaluewarning(key,col,row,cell.value)
-                                warning=True
                             else:
                                 lookup["METADATA"][shortname.value][value]=1
                         else:
                             lookup["METADATA"][shortname.value][value]=1
+                    if not valid:
+                        key="Unknown metadatavalue for %s" % shortname.value
+                        self.addvaluewarning(key,col,row,cell.value)
+                        warning=True
+                        lookup["METADATA"][shortname.value][value]=-1
+            
                 elif shortname.value == "SPECIESID":
+                    
                     sampletype=self.sht.cell_value(row,sampletypecol)
                     self.cursor.execute(self.sqlValidSpecies,cell.value,sampletype)
                     valid=(self.cursor.fetchall()[0][0]>0 or cell.ctype==xlrd.XL_CELL_EMPTY)
@@ -276,12 +328,12 @@ class excelfile:
                 row=row+1
             # print(col,sampletypecol) 
             elaps=time.time()-starttime
-            print("Kolonne:",colname(col)," ",shortname.value," ",s2.value," tid:",elaps)
+            print("Kolonne:",colname(col)," ",shortname.value," ",type.value," tid:",elaps)
             col = col +1
         self.nonhandeled=nonhandeled
         
     def addvalueerror(self,key,col,row,value):
-        cellid=colname(col)+str(row+1)
+        cellid=colname(col)+str(row+2) # Need +2 for some reason...
         if self.valueerror[key][value]=={}:
             self.valueerror[key][value]=[cellid]
         else:
@@ -290,7 +342,7 @@ class excelfile:
        
     def addvaluewarning(self,key,col,row,value):
         # using zero-based row numbers
-        cellid=colname(col)+str(row+1)
+        cellid=colname(col)+str(row+2) # Need +2 for some reason...
         if self.valuewarning[key][value]=={}:
             self.valuewarning[key][value]=[cellid]
         else:
@@ -315,8 +367,10 @@ class excelfile:
         self.project=rows[0][0]
         if self.sht.cell_value(2,0) != "":
             raise ValueError(self.ExpectedBlank)
-        self.fields=self.sht.row(3) 
-        self.types=self.sht.row(4)
+        if self.sht.cell_value(3,0) == "":
+            self.headerRows=6
+        self.fields=self.sht.row(self.headerRows-2) 
+        self.types=self.sht.row(self.headerRows-1)
         self.ShortnameStatus=[]
         ## Regular expression for checking for valid nuclide format
         regexpnuc='^[A-Z]{1,2}([0-9]{1,3}m{0,1}){0,1}(\\_{0,1}[0-9]{0,3}){0,1}(\\#{0,1}[0-9]{0,9}){0,1}$'
@@ -402,7 +456,7 @@ class excelfile:
         # print(self.ShortnameStatus)
         # print("True:",self.validvalues.count(True))
         # print("False:",self.validvalues.count(False))
-        #print("Nonhandeled:",self.nonhandeled)
+        print("Nonhandeled:",self.nonhandeled)
         #print(self.valuewarning)
         # print(self.valueerror)
           
@@ -411,7 +465,8 @@ if __name__ == '__main__':
         file="RAME kyststasjoner.xlsx"
     else:
         file=sys.argv[1]
-    dir="..\\testdata\\"
+    dir="C:\\Users\\mortens\\SharePoint\\Resultatarkivet - Dokumenter\\Forsøk på koding av datasett\\"
+    # dir="..\\testdata\\"
     test=excelfile(dir+file)
     test.check()
     test.debug()

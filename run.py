@@ -34,7 +34,7 @@ app.jinja_env.filters['datetimefilter'] = datetimefilter
 
 @app.route("/")
 def template_test():
-    return render_template('template.html', my_string="Strålevernets resultatarkiv", 
+    return render_template('template.html', my_string=request.environ.get('REMOTE_USER'), 
         my_list=[], title="Resultatarkiv", current_time=datetime.datetime.now())
 
 @app.route("/home")
