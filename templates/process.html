@@ -20,7 +20,19 @@
          <input type="submit" id="importdata" value="Import data">
     </form>
  
-  
+  {% if valueerrors|length >0 %}
+  <script>
+  document.getElementById("importdata").disabled = true;
+  fatalerrors = true;
+  </script>
+  <h2>Errors on data</h2>
+  <p>If there are any errors, they need to be corrected externally and the data sheet must be re-uploaded.</p>
+   <table>{% for key, hash in valueerrors.items() %}
+	<tr><th colspan="2">{{ key }}</th></tr> </dt>{% for key, value in hash.items() %}
+	 <tr><td style="white-space: nowrap;">{{ key }} </td>
+     <td>{% for cell  in value %}{{ cell }} {%endfor %}</td>
+     </tr>{% endfor %}
+  {% endfor %}</table> {% endif %}
   {% if valuewarnings|length >0 %}
   <script>
   document.getElementById("importdata").disabled = true;
@@ -35,19 +47,6 @@
   {% endfor %}</table>
   {% endif %}
   
-  {% if valueerrors|length >0 %}
-  <script>
-  document.getElementById("importdata").disabled = true;
-  fatalerrors = true;
-  </script>
-  <h2>Errors on data</h2>
-  <p>If there are any errors, they need to be corrected externally and the data sheet must be re-uploaded.</p>
-   <table>{% for key, hash in valueerrors.items() %}
-	<tr><th colspan="2">{{ key }}</th></tr> </dt>{% for key, value in hash.items() %}
-	 <tr><td style="white-space: nowrap;">{{ key }} </td>
-     <td>{% for cell  in value %}{{ cell }} {%endfor %}</td>
-     </tr>{% endfor %}
-  {% endfor %}</table> {% endif %}
   {% block footer %}
   {{super()}}
   {% endblock %}
