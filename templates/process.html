@@ -2,6 +2,8 @@
 {% block title %}{{title}}{% endblock %}
 {% block head %}
   {{ super() }}
+  <script type="text/javascript" src="{{ url_for('static', filename='process.js') }}"></script>
+
 {% endblock %}
 {% block page %}{{title}}{% endblock %}
 {% block heading %}
@@ -40,8 +42,9 @@
   <h2>Warnings on data</h2>
   <p>Check warnings that should be ignored.</p>
   <table>{% for key, hash in valuewarnings.items() %}
-	<tr><th colspan="2">{{ key }}</th></tr> </dt>{% for key, value in hash.items() %}
-	 <tr><td style="white-space: nowrap;"><input type="checkbox" id="{{ key }}" /> {{ key }} </td>
+	{% set outerloop=loop %}
+    <tr><th colspan="2">{{ key }}</th></tr> </dt>{% for key, value in hash.items() %}
+	 <tr><td style="white-space: nowrap;"><input class="warncheck" type="checkbox" id="Warncheck{{outerloop.index}}{{loop.index}}" /> {{ key }} </td>
      <td>{% for cell  in value %}{{ cell }} {%endfor %}</td>
      </tr>{% endfor %}
   {% endfor %}</table>
