@@ -130,7 +130,7 @@ class excelfile:
             else:
                 self.lookup[type][shortname][cell.value]=1
 
-    
+                
     def checkdata(self):
         if len(self.ShortnameStatus)==0:
             raise ValueError(self.InvalidProjectid)
@@ -269,28 +269,8 @@ class excelfile:
                             self.addvalueerror("Invalid value for %s" % cell.value,col,row,cell.value)
                 elif type.value == "UNCMETHOD" or shortname.value.endswith("_UNCMEASURE"):
                     self.checkItemEmptyOK(type.value,shortname.value,cell,self.sqlValidUncmethod,col,row,"Unknown uncertainty definition")
-                elif type.value == "UNCMETHOD0" or shortname.value.endswith("_UNCMEASURE0"):
-                    valid=lookup["UNCMETHOD"][shortname.value][cell.value]==1
-                    if not valid:
-                        self.cursor.execute(self.sqlValidUncmethod,cell.value)
-                        valid=(self.cursor.fetchall()[0][0]>0 or cell.ctype==xlrd.XL_CELL_EMPTY)    
-                        if not valid:
-                            key="Unknown uncertainty definition"
-                            self.addvaluewarning(key,col,row,cell.value)
-                            warning=True
-                        else:
-                            lookup["UNCMETHOD"][shortname.value][cell.value]=1
                 elif type.value == "INSTRUMENT" or shortname.value.endswith("_INSTRUMENT"):
-                    valid=lookup["INSTRUMENT"][shortname.value][cell.value]==1
-                    if not valid:
-                        self.cursor.execute(self.sqlValidInstrument,cell.value)
-                        valid=(self.cursor.fetchall()[0][0]>0 or cell.ctype==xlrd.XL_CELL_EMPTY)    
-                        if not valid:
-                            key="Unknown uncertainty definition"
-                            self.addvaluewarning(key,col,row,cell.value)
-                            warning=True
-                        else:
-                            lookup["INSTRUMENT"][shortname.value][cell.value]=1
+                    self.checkItemEmptyOK(type.value,shortname.value,cell,self.sqlValidInstrument,col,row,"Unknown instrument")
                 elif shortname.value == "WEEKNR":
                     valid = cell.ctype==xlrd.XL_CELL_EMPTY or (cell.ctype==xlrd.XL_CELL_NUMBER  and cell.value > 0 and cell.value < 54)
                 elif type.value == "METADATA" and shortname.value in allowNewValues:
