@@ -18,16 +18,12 @@
   <p>Processing uploaded file...</p>
   <p>Valid header: {{okheader}}</p>
    <form action="/importdata" method="post" enctype="multipart/form-data">
-      <input type="hidden" name="file" value="filename">
+      <input type="hidden" name="file" value={{ filepath }}>
          <input type="submit" id="importdata" value="Import data">
     </form>
  
   {% if valueerrors|length >0 %}
-  <script>
-  document.getElementById("importdata").disabled = true;
-  fatalerrors = true;
-  </script>
-  <h2>Feil i data</h2>
+  <h2 id="Errorheader">Feil i data</h2>
   <p>Feil må rettes eksternt og arket må lastes opp på nytt</p>
    <table>{% for key, hash in valueerrors.items() %}
 	<tr><th colspan="2">{{ key }}</th></tr> </dt>{% for key, value in hash.items() %}
@@ -36,10 +32,7 @@
      </tr>{% endfor %}
   {% endfor %}</table> {% endif %}
   {% if valuewarnings|length >0 %}
-  <script>
-  document.getElementById("importdata").disabled = true;
-  </script>
-  <h2>Warnings on data</h2>
+  <h2 id="Warningheader">Warnings on data</h2>
   <p>Check warnings that should be ignored.</p>
   <table>{% for key, hash in valuewarnings.items() %}
 	{% set outerloop=loop %}
