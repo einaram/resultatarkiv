@@ -81,20 +81,23 @@ class excelfile:
         self.NotCheckDataMessage = "Did not check column '%s' of type %s, because it is a string."   
         self.ShortSummaryValidation = "Checked data in %i columns. %i are OK, and %i are not ok and should be checked based on error messages above."
         self.ExpectedBlank = "Forventet blank (%s)"
+        self.errorUnknown = "Ukjent verdi i %s"
         self.invalidColOrder = "%s må komme før %s"
         self.invalidDate="Feil dato - må være åååå.mm.dd evt med tt:mm:ss"
         self.warningEmpty="%s has no data"
         self.errorUnhandeled="Ikke-håndterte data, sjekk at headere er riktige"
+        self.warningUnknown="Ny verdi i %s"
         
         self.sqlValidNoNuc="select count(shortname) from validData where shortname=? and attrtype!='NUCLIDE'"
         self.sqlValidGetParam="select count(shortname) from validData where shortname=? and attrtype=?"
-        self.sqlValidSubtype="select count(stl.id) from samplesubtypelist sstl left join sampletypelist stl on stl.id=sampletypelistid where stl.shortname=? and sstl.name =?"    
+        self.sqlValidSampletype="select count(id) from sampletypelist where shortname=?"
+        self.sqlValidSubtype="select count(stl.id) from samplesubtypelist sstl left join sampletypelist stl on stl.id=sampletypelistid where sstl.name =? and stl.shortname=? "    
         self.sqlValidMetadata="select count(smd.id) from samplemetadata smd left join metadatalist md on smd.metadataid=md.id where md.shortname=? and smd.value=?"
         self.sqlValidLaboratory="select count(id) from samplevalue where laboratory = ?"
         self.sqlValidUncmethod="select count(id) from samplevalue where uncmeasure = ?"
         self.sqlValidInstrument="select count(id) from samplevalue where instrument = ?"
         self.sqlValidSpecies="select count(sp.id) from specieslist sp left join sampletypelist st on sp.sampletypeid = st.id where sp.id=? and st.shortname=?"
-        self.sqlValidAreaId="select count(areaid) from GeoAreas where objtype=? and areaid=?"
+        self.sqlValidAreaId="select count(areaid) from GeoAreas where areaid=? and objtype=?"
         
         self.nuclide=[]
         self.ShortnameStatus=[]
@@ -119,16 +122,27 @@ class excelfile:
         if self.validheader:
             self.checkdata()
     
-    def checkItemEmptyOK(self,type,shortname,cell,sql,col,row,message):
-        valid=self.lookup[type][shortname][cell.value]==1
-        if not valid:
-            self.cursor.execute(self.sqlValidUncmethod,cell.value)
-            valid=(self.cursor.fetchall()[0][0]>0 or cell.ctype==xlrd.XL_CELL_EMPTY)    
-            if not valid:
-                self.addvaluewarning(message,col,row,cell.value)
-                warning=True
+    def checkItem(self,type,shortname,cell,sql,col,row,message,emptyOK=True,warning=True,extraparam=None):
+        seen = False
+        valid = False
+        if cell.value in self.lookup[type][shortname]:
+            valid=self.lookup[type][shortname][cell.value]==1
+            seen = True
+        valid = valid or ((cell.ctype==xlrd.XL_CELL_EMPTY or cell.value=="" )and emptyOK)
+        if not (seen or valid):
+            if extraparam==None:
+                self.cursor.execute(sql,cell.value)
             else:
-                self.lookup[type][shortname][cell.value]=1
+                self.cursor.execute(sql,cell.value,extraparam)
+            valid=(self.cursor.fetchall()[0][0]>0)    
+        if not valid:
+            if warning:
+                self.addvaluewarning(message,col,row,cell.value)
+            else:
+                self.addvalueerror(message,col,row,cell.value)
+            self.lookup[type][shortname][cell.value]=-1
+        else:
+            self.lookup[type][shortname][cell.value]=1
 
                 
     def checkdata(self):
@@ -142,7 +156,6 @@ class excelfile:
         parentcol=-1
         parentdata=[]
         nonhandeled=0
-        laboratory=[] # Workaround until database is updated with index on laboratory search ZZZ
         units=[]
         allowNewValues=["SAMPLEID","LIMSNR"] # Will accept new values for metadata
         
@@ -180,51 +193,25 @@ class excelfile:
                             raise ValueError(self.invalidColOrder)
                         valid=(parentdata.count(cell.value)>0 or cell.ctype==xlrd.XL_CELL_EMPTY)
                 elif type.value == "AREAID":
-                    seen=False
                     value=cell.value
                     if cell.ctype==xlrd.XL_CELL_NUMBER:
                         value=str(int(value))
                     if shortname.value=="KOMMUNE":
-                        if len(value)==3:
+                        if len(value)==3 and cell.ctype==xlrd.XL_CELL_NUMBER:
                             value="0"+value
-                    if value in lookup[shortname.value][type.value]:
-                        valid=(lookup[shortname.value][type.value][value]==1) or (cell.ctype==xlrd.XL_CELL_EMPTY)
-                        seen=True
-                    valid = valid or cell.ctype == xlrd.XL_CELL_EMPTY
-                    if not (seen or valid):
-                        self.cursor.execute(self.sqlValidAreaId,shortname.value,value)
-                        print("SQL:"+value)
-                        res=self.cursor.fetchall()[0][0]
-                        print(res)
-                        valid=(res>0 or cell.ctype==xlrd.XL_CELL_EMPTY)
-                        if not valid:
-                            key="Unknown metadatavalue for %s" % shortname.value
-                            warning=True
-                            lookup[shortname.value][type.value][value]=-1
-                        else:
-                            lookup[shortname.value][type.value][value]=1
-                    if not valid:
-                        key="Unknown metadatavalue for %s" % shortname.value
-                        self.addvaluewarning(key,col,row,value)
-                        warning=True
-                    
+                    cell.value=value
+                    self.checkItem(type.value,shortname.value,cell,self.sqlValidAreaId,col,row,self.errorUnknown% shortname.value,emptyOK=True,warning=False,extraparam=shortname.value)
                 elif shortname.value=="SAMPLETYPE":
                     # Valid if sampletype is defined
+                    # def checkItem(self,type,shortname,cell,sql,col,row,message,emptyOK=True):
                     sampletypecol=col # Possible need to look up from subtype or species
-                    value=cell.value
-                    valid=(lookup[shortname.value][type.value][value]==1)
-                    if not valid:
-                        self.cursor.execute(self.sqlValidGetParam,cell.value, shortname.value)
-                        valid=(self.cursor.fetchall()[0][0]>0 and cell.ctype != xlrd.XL_CELL_EMPTY)
-                        if valid:
-                            lookup[shortname.value][type.value][value]=1
+                    self.checkItem(type.value,shortname.value,cell,self.sqlValidSampletype,col,row,self.errorUnknown% shortname.value,emptyOK=False,warning=False)
                 elif shortname.value=="SAMPLESUBTYPE":
                     # Valid if subtype is defined and correct for sampletype
                     if sampletypecol < 0:
                         raise ValueError(invalidColOrder % ('Sampletype','Subtype'))
                     sampletype=self.sht.cell_value(row,sampletypecol)
-                    self.cursor.execute(self.sqlValidSubtype,sampletype,cell.value)
-                    valid=cell.ctype==xlrd.XL_CELL_EMPTY or self.cursor.fetchall()[0][0]>0
+                    self.checkItem(type.value,shortname.value,cell,self.sqlValidSubtype,col,row,self.errorUnknown% shortname.value,emptyOK=True,warning=False,extraparam=sampletype)
                 elif shortname.value=="REF_DATE" or shortname.value=="SAMPLE_DATE":
                     # Any date is valid
                     valid=cell.ctype==xlrd.XL_CELL_DATE
@@ -250,7 +237,10 @@ class excelfile:
                             valid=True # Will be trown out if parsing does not work
                         except ValueError:
                             valid=False
-                            self.addvalueerror(self.invalidDate,col,row,cell.value)
+                            if cell.ctype==xlrd.XL_CELL_EMPTY:
+                                self.addvaluewarning(self.warningEmpty% shortname.value,col,row,"No data")
+                            else:
+                                self.addvalueerror(self.invalidDate,col,row,cell.value)
                 elif shortname.value == "LATITUDE":
                     # Valid numbers from -90 to 90- inclusive
                     if cell.ctype==xlrd.XL_CELL_EMPTY:
@@ -268,9 +258,9 @@ class excelfile:
                         if not valid:
                             self.addvalueerror("Invalid value for %s" % cell.value,col,row,cell.value)
                 elif type.value == "UNCMETHOD" or shortname.value.endswith("_UNCMEASURE"):
-                    self.checkItemEmptyOK(type.value,shortname.value,cell,self.sqlValidUncmethod,col,row,"Unknown uncertainty definition")
+                    self.checkItem(type.value,shortname.value,cell,self.sqlValidUncmethod,col,row,self.warningUnknown% shortname.value)
                 elif type.value == "INSTRUMENT" or shortname.value.endswith("_INSTRUMENT"):
-                    self.checkItemEmptyOK(type.value,shortname.value,cell,self.sqlValidInstrument,col,row,"Unknown instrument")
+                    self.checkItem(type.value,shortname.value,cell,self.sqlValidInstrument,col,row,self.warningUnknown% shortname.value)
                 elif shortname.value == "WEEKNR":
                     valid = cell.ctype==xlrd.XL_CELL_EMPTY or (cell.ctype==xlrd.XL_CELL_NUMBER  and cell.value > 0 and cell.value < 54)
                 elif type.value == "METADATA" and shortname.value in allowNewValues:
@@ -289,34 +279,25 @@ class excelfile:
                         valid=(cell.ctype==xlrd.XL_CELL_EMPTY or self.cursor.fetchall()[0][0]>0)
                         if not valid:
                             if cell.ctype==xlrd.XL_CELL_NUMBER:
-                                value=int(value)
-                                self.cursor.execute(self.sqlValidMetadata,shortname.value,str(value))
+                                #value=int(value)
+                                self.cursor.execute(self.sqlValidMetadata,shortname.value,str(int(value)))
                                 valid=(self.cursor.fetchall()[0][0]>0 or cell.ctype==xlrd.XL_CELL_EMPTY)
-                            else:
-                                lookup["METADATA"][shortname.value][value]=1
-                        else:
-                            lookup["METADATA"][shortname.value][value]=1
                     if not valid:
                         key="Unknown metadatavalue for %s" % shortname.value
                         self.addvaluewarning(key,col,row,cell.value)
                         warning=True
                         lookup["METADATA"][shortname.value][value]=-1
-            
+                    else:
+                        lookup["METADATA"][shortname.value][value]=1
                 elif shortname.value == "SPECIESID":
-                    
+                    #self.checkItem(type.value,shortname.value,cell,self.sqlValidInstrument,col,row,self.warningUnknown% shortname.value)
+                    # Todo: Rewrite checkItem to allow multiparameter query
                     sampletype=self.sht.cell_value(row,sampletypecol)
                     self.cursor.execute(self.sqlValidSpecies,cell.value,sampletype)
                     valid=(self.cursor.fetchall()[0][0]>0 or cell.ctype==xlrd.XL_CELL_EMPTY)
-                    
+ 
                 elif type.value == "LABORATORY":
-                    # Valid if laboratory seen before or empty
-                    # Todo: Either add index on laboratory (need to change the col to varchar(100))  
-                    valid=(laboratory.count(cell.value)>0) # workaround ZZZ
-                    if not valid: # workaround ZZZ
-                        self.cursor.execute(self.sqlValidLaboratory,cell.value)
-                        valid=(self.cursor.fetchall()[0][0]>0 or cell.ctype==xlrd.XL_CELL_EMPTY)
-                        if valid: # workaround ZZZ
-                            laboratory.append(cell.value)
+                    self.checkItem(type.value,shortname.value,cell,self.sqlValidLaboratory,col,row,self.warningUnknown% type.value)
                 elif units.count(type.value): # This is a number
                     valid=(cell.ctype==xlrd.XL_CELL_NUMBER or cell.ctype==xlrd.XL_CELL_EMPTY)
                 elif shortname.value=="COMMENT":
@@ -339,7 +320,7 @@ class excelfile:
         self.nonhandeled=nonhandeled
         
     def addvalueerror(self,key,col,row,value):
-        cellid=colname(col)+str(row+2) # Need +2 for some reason...
+        cellid=colname(col)+str(row+1)
         if self.valueerror[key][value]=={}:
             self.valueerror[key][value]=[cellid]
         else:
@@ -348,7 +329,7 @@ class excelfile:
        
     def addvaluewarning(self,key,col,row,value):
         # using zero-based row numbers
-        cellid=colname(col)+str(row+2) # Need +2 for some reason...
+        cellid=colname(col)+str(row+1)
         if self.valuewarning[key][value]=={}:
             self.valuewarning[key][value]=[cellid]
         else:
