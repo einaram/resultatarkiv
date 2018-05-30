@@ -64,13 +64,16 @@ def process():
             file.save(filepath)
             importfile=excelfile(filepath)
             importfile.check()
-    return render_template('process.html', my_string= request.files['file'].filename, 
+    return render_template('process.html', my_string= request.files['file'].filename, filepath=filepath,
         title="Processing file", current_time=datetime.datetime.now(),okheader=importfile.validheader(),
         valuewarnings=importfile.valuewarning,valueerrors=importfile.valueerror,md5=importfile.md5)
 
 @app.route("/importdata", methods=['POST'] )
 def importdata():
-    return render_template('importdata.html', title="Importerer data")
+    filepath=request.form['filepath']
+    importfile=excelfile(filepath)
+    importfile.importdata()
+    return render_template('importdata.html', title="Importerer data",filepath=filepath,md5=importfile.md5)
 
         
 @app.route("/about")

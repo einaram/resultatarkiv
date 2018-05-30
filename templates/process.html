@@ -18,7 +18,7 @@
   <p>Processing uploaded file...</p>
   <p>Valid header: {{okheader}}</p>
    <form action="/importdata" method="post" enctype="multipart/form-data">
-      <input type="hidden" name="file" value={{ filepath }}>
+      <input type="hidden" name="filepath" value={{ filepath }}>
          <input type="submit" id="importdata" value="Import data">
     </form>
  

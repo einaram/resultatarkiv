@@ -104,7 +104,7 @@ class excelfile:
         self.server="Server=NRPA-3220\\SQLEXPRESS;"
         self.database="DataArkiv"
         #self.server="Server=databasix2\\databasix2;"
-        connectstring="Driver={SQL Server Native Client 11.0};"+self.server+"Database="+self.database+";"+"Trusted_Connection=yes;"
+        connectstring="Driver={SQL Server Native Client 11.0};"+self.server+"Database="+self.database+";"+"Trusted_Connection=yes;Autocommit=False"
         cnxn = pyodbc.connect(
                       connectstring
                       )
@@ -113,9 +113,61 @@ class excelfile:
         self.valueerror=tree()
         self.SEENBEFORE=1
         self.headerRows=5
+        wb = open_workbook(self.file)
+        self.sht = wb.sheet_by_index(0)
+        if self.sht.cell_value(3,0) == "":
+            self.headerRows=6
+        self.fields=self.sht.row(self.headerRows-2) 
+        self.types=self.sht.row(self.headerRows-1)
         self.lookup=tree()
         self.dateFormat=None
+        self.md5=md5sum(self.file)
         
+        
+    def fetchlist(self,sql):
+        self.cursor.execute(sql)
+        list=[]
+        row = self.cursor.fetchone()
+        while row is not None:
+            list.append(row[0])
+            row = self.cursor.fetchone()     
+        return(list)
+    
+    def importdata(self):
+        row=self.headerRows
+        xlrow=list(self.sht.row(row))
+        sampledata=tree()
+        units=self.fetchlist("select shortname from unitlist")
+        nucs=self.fetchlist("select shortname from nuclidelist")
+        for field,type,cell in zip(self.fields,self.types,xlrow):
+            #print(field,type,cell.value)
+            parts=re.split(r'[_#]',field.value)
+            if len(parts)>1:
+                if parts[0]+"_"+parts[1] in nucs:
+                    parts[0]=parts[0]+"_"+parts[1]
+                    del parts[1]
+            if (parts[0] in nucs) and cell.value !="":
+                key=parts[0]
+                param="ACT"
+                if len(parts)==2:
+                    param=parts[1]
+                if len(parts)==3:
+                    key=parts[0]+"#"+parts[1]
+                    param=parts[2]
+                sampledata['NUCS'][key][parts[0]][param]=[cell.value,type.value]
+            elif type.value in units and cell.value !="":
+                sampledata['VALUE'][field.value]=[cell.value,type.value]
+            elif cell.value != "":
+                    sampledata[type.value][field.value]=cell.value
+        for item in sampledata:
+            print(item)
+            for key in sampledata[item]:
+                print("...",key,sampledata[item][key])
+                False
+        
+    
+
+    
     def check(self):
         self.ShortnameStatus=[]
         self.checkheader()
@@ -143,8 +195,11 @@ class excelfile:
             self.lookup[type][shortname][cell.value]=-1
         else:
             self.lookup[type][shortname][cell.value]=1
+    
+    
+    
 
-                
+    
     def checkdata(self):
         if len(self.ShortnameStatus)==0:
             raise ValueError(self.InvalidProjectid)
@@ -338,9 +393,6 @@ class excelfile:
          
          
     def checkheader(self):
-        self.md5=md5sum(self.file)
-        wb = open_workbook(self.file)
-        self.sht = wb.sheet_by_index(0)
         projecttype=self.sht.cell_value(0,0)
         if projecttype != 'PROJECTID':
             raise ValueError("Ukjent prosjekttype (A1)")
@@ -354,10 +406,6 @@ class excelfile:
         self.project=rows[0][0]
         if self.sht.cell_value(2,0) != "":
             raise ValueError(self.ExpectedBlank)
-        if self.sht.cell_value(3,0) == "":
-            self.headerRows=6
-        self.fields=self.sht.row(self.headerRows-2) 
-        self.types=self.sht.row(self.headerRows-1)
         self.ShortnameStatus=[]
         ## Regular expression for checking for valid nuclide format
         regexpnuc='^[A-Z]{1,2}([0-9]{1,3}m{0,1}){0,1}(\\_{0,1}[0-9]{0,3}){0,1}(\\#{0,1}[0-9]{0,9}){0,1}$'
