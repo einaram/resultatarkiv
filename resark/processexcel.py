@@ -133,16 +133,29 @@ class excelfile:
             row = self.cursor.fetchone()     
         return(list)
     
+    def cachelookup(self,value,table):
+        sql="select id from "+table+" where shortname=?"
+        id = None
+        if value in self.cache[table]:
+            id=self.cache[table][value]
+        else:
+            self.cursor.execute(sql,value)
+            id=self.cursor.fetchall()[0][0]
+            self.cache[table][value]=id
+        return(id)
+            
     def importdata(self):
         row=self.headerRows
         xlrow=list(self.sht.row(row))
+        self.cache=tree()
         sampledata=tree()
+        projectid=self.sht.cell_value(1,0)
         units=self.fetchlist("select shortname from unitlist")
         nucs=self.fetchlist("select shortname from nuclidelist")
         for field,type,cell in zip(self.fields,self.types,xlrow):
             #print(field,type,cell.value)
             parts=re.split(r'[_#]',field.value)
-            if len(parts)>1:
+            if len(parts)>1: # Checking for nuclide combos like PU239_240
                 if parts[0]+"_"+parts[1] in nucs:
                     parts[0]=parts[0]+"_"+parts[1]
                     del parts[1]
@@ -163,7 +176,85 @@ class excelfile:
             print(item)
             for key in sampledata[item]:
                 print("...",key,sampledata[item][key])
-                False
+        sample=sampledata["BASE"]
+        samplefields=["REF_DATE","SAMPLETYPE","AREAID","COMMENT","SPECIESID","SAMPLESTART","SAMPLESTOP","PARENTSAMPLE","LOCATION","SAMPLEDATE"]
+        for field in samplefields:
+            if not field in sample:
+                sample[field]=None
+            else:
+                if field=="SAMPLETYPE":
+                    sample[field]=self.cachelookup(sample[field],"sampletypelist")
+        #TODO: Look into proper parameterization of lat and lon in STGeomFromText
+        samplesql="insert into sample(projectid,reftime,sampletype,areaid,comment,speciesid,samplestart,samplestop,parentsampleid,location,sample_date) values(?,?,?,?,?,?,?,?,?,geometry::STGeomFromText('POINT ("+str(sample["LONGITUDE"])+" "+str(sample["LATITUDE"])+")',4326),?)"
+        self.cursor.execute(samplesql,projectid,sample["REF_DATE"],sample["SAMPLETYPE"],sample["AREAID"],sample["COMMENT"],sample["SPECIESID"],sample["SAMPLESTART"],sample["SAMPLESTOP"],sample["PARENTSAMPLE"],sample["SAMPLEDATE"])
+        self.cursor.execute("SELECT max(id) from sample")
+        sampleid=self.cursor.fetchall()[0][0]
+        print(sampleid)
+        sql="insert into samplemetadata(sampleid,value,metadataid) values(?,?,?)"
+        for item in sampledata["METADATA"]:
+            print(item)
+            value=sampledata["METADATA"][item]
+            print(value)
+            metadataid=self.cachelookup(item,"metadatalist")
+            self.cursor.execute(sql,sampleid,value,metadataid)
+            self.cursor.execute("SELECT max(id) from samplemetadata")
+            print(self.cursor.fetchall()[0][0])
+        for item in sampledata["VALUE"]:
+            sql="insert into samplevalue(sampleid,value,quantityid,unitid) values(?,?,?,?)"
+            print(item)
+            value=sampledata["VALUE"][item]
+            print(value)
+            quantityid=self.cachelookup(item,"quantitylist")
+            unitid=self.cachelookup(value[1],"unitlist")
+            self.cursor.execute(sql,sampleid,value[0],quantityid,unitid)
+            self.cursor.execute("SELECT max(id) from samplevalue")
+            print(self.cursor.fetchall()[0][0])
+        for item in sampledata["NUCS"]:
+            sql="insert into samplevalue(sampleid,value,unitid,unc_value,unc_unitid,mda_value,mda_unitid,laboratory,comment,quantityid,nuclideid,instrument,uncmeasure,below_mda) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+            unc_value=None
+            unc_unitid=None
+            mda_value=None
+            mda_unitid=None
+            laboratory=None
+            comment=None
+            instrument=None
+            uncmeasure=None
+            below_mda=None
+            for nuc,params in sampledata["NUCS"][item].items():
+                print(nuc)
+                nuclideid=self.cachelookup(nuc,"nuclidelist")
+                for param,values in params.items():
+                    print(param,values)
+                    if param=="ACT":
+                        value=values[0]
+                        unitid=self.cachelookup(values[1],"unitlist")
+                        if values[1].startswith("BQ"):
+                            quantityid=self.cachelookup("ACTIVITY","quantitylist")
+                        else:
+                            quantityid=self.cachelookup("DOSE","quantitylist")
+                    elif param=="LAB":
+                        laboratory=values[0]
+                    elif param=="UNC":
+                        unc_value=values[0]
+                        unc_unitid=self.cachelookup(values[1],"unitlist")
+                    elif param=="MDA":
+                        mda_value=values[0]
+                        mda_unitid=self.cachelookup(values[1],"unitlist")
+                    elif param=="COMMENT":
+                        comment=values[0]
+                    elif param=="UNCMEASURE":
+                        uncmeasure=param[0]
+                    elif values[1]=="INSTRUMENT":
+                        instrument=values[0]
+                    elif values[1]=="BELOW_MDA":
+                        below_mda=values[0]
+                print(comment)
+                print(laboratory)
+                print(quantityid)
+                self.cursor.execute(sql,sampleid,value,unitid,unc_value,unc_unitid,mda_value,mda_unitid,laboratory,comment,quantityid,nuclideid,instrument,uncmeasure,below_mda)    
+                self.cursor.execute("SELECT max(id) from samplevalue")
+                print(self.cursor.fetchall()[0][0])
+        self.cursor.commit()
         
     
 
