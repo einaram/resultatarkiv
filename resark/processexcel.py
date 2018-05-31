@@ -87,6 +87,7 @@ class excelfile:
         self.warningEmpty="%s has no data"
         self.errorUnhandeled="Ikke-håndterte data, sjekk at headere er riktige"
         self.warningUnknown="Ny verdi i %s"
+        self.warningUnknownMetadata="Ukjent metadatatype"
         
         self.sqlValidNoNuc="select count(shortname) from validData where shortname=? and attrtype!='NUCLIDE'"
         self.sqlValidGetParam="select count(shortname) from validData where shortname=? and attrtype=?"
@@ -121,7 +122,11 @@ class excelfile:
         self.types=self.sht.row(self.headerRows-1)
         self.lookup=tree()
         self.dateFormat=None
+        self.nucs=None
         self.md5=md5sum(self.file)
+        sql="insert into datafile (filename,md5,imported,analysed) values (?,?,0,0)"
+        self.cursor.execute(sql,file,self.md5)
+        self.cursor.commit()
         
         
     def fetchlist(self,sql):
@@ -144,25 +149,30 @@ class excelfile:
             id=self.cursor.fetchall()[0][0]
             self.cache[table][value]=id
         return(id)
-            
+    
+    def parsenuc(self,value):
+        if self.nucs==None:
+            self.nucs=self.fetchlist("select shortname from nuclidelist")
+        parts=re.split(r'[_#]',value)
+        if len(parts)>1: # Checking for nuclide combos like PU239_240
+            if parts[0]+"_"+parts[1] in self.nucs:
+                parts[0]=parts[0]+"_"+parts[1]
+                del parts[1]
+        return(parts)
+    
     def importdata(self):
         self.cache=tree()
         sampledata=tree()
         projectid=self.sht.cell_value(1,0)
         units=self.fetchlist("select shortname from unitlist")
-        nucs=self.fetchlist("select shortname from nuclidelist")
         sampleset=tree()
             
         for row in range(self.headerRows, self.sht.nrows): 
             xlrow=list(self.sht.row(row))
             for field,type,cell in zip(self.fields,self.types,xlrow):
                 #print(field,type,cell.value)
-                parts=re.split(r'[_#]',field.value)
-                if len(parts)>1: # Checking for nuclide combos like PU239_240
-                    if parts[0]+"_"+parts[1] in nucs:
-                        parts[0]=parts[0]+"_"+parts[1]
-                        del parts[1]
-                if (parts[0] in nucs) and cell.value !="":
+                parts=self.parsenuc(field.value)
+                if (parts[0] in self.nucs) and cell.value !="":
                     key=parts[0]
                     param="ACT"
                     if len(parts)==2:
@@ -279,6 +289,7 @@ class excelfile:
                     self.cursor.execute(sql,sampleid,value,unitid,unc_value,unc_unitid,mda_value,mda_unitid,laboratory,comment,quantityid,nuclideid,instrument,uncmeasure,below_mda)    
                     self.cursor.execute("SELECT max(id) from samplevalue")
                     print(self.cursor.fetchall()[0][0])
+            self.cursor.execute("update datafile set imported=1 where filename=? and md5 = ?",self.file,self.md5)
             self.cursor.commit()
             
     
@@ -328,7 +339,7 @@ class excelfile:
         parentdata=[]
         nonhandeled=0
         units=[]
-        allowNewValues=["SAMPLEID","LIMSNR"] # Will accept new values for metadata
+        allowNewValues=["SAMPLEID","LIMSNR","WEEKNR"] # Will accept new values for metadata
         
         sql="select shortname from unitlist"
         for row in self.cursor.execute(sql):
@@ -355,6 +366,8 @@ class excelfile:
                             if p.ctype !=xlrd.XL_CELL_EMPTY:
                                 parentdata.append(p.value)
                     valid=True
+                elif shortname.value == "WEEKNR":
+                    valid = cell.ctype==xlrd.XL_CELL_EMPTY or (cell.ctype==xlrd.XL_CELL_NUMBER  and cell.value > 0 and cell.value < 54)
                 elif shortname.value=="CONNECT_TO_PARENT":
                     # Should have a valid parent_id
                     if cell.ctype==xlrd.XL_CELL_EMPTY:
@@ -432,8 +445,6 @@ class excelfile:
                     self.checkItem(type.value,shortname.value,cell,self.sqlValidUncmethod,col,row,self.warningUnknown% shortname.value)
                 elif type.value == "INSTRUMENT" or shortname.value.endswith("_INSTRUMENT"):
                     self.checkItem(type.value,shortname.value,cell,self.sqlValidInstrument,col,row,self.warningUnknown% shortname.value)
-                elif shortname.value == "WEEKNR":
-                    valid = cell.ctype==xlrd.XL_CELL_EMPTY or (cell.ctype==xlrd.XL_CELL_NUMBER  and cell.value > 0 and cell.value < 54)
                 elif type.value == "METADATA" and shortname.value in allowNewValues:
                     valid=True
                 elif type.value == "METADATA":
@@ -489,7 +500,12 @@ class excelfile:
             print("Kolonne:",colname(col)," ",shortname.value," ",type.value," tid:",elaps)
             col = col +1
         self.nonhandeled=nonhandeled
-        
+        errors=0
+        if len(self.valueerror)>0:
+            errors=1
+        self.cursor.execute("update datafile set analysed=1,errors=? where filename=? and md5 = ?",errors,self.file,self.md5)
+        self.cursor.commit()
+            
     def addvalueerror(self,key,col,row,value):
         cellid=colname(col)+str(row+1)
         if self.valueerror[key][value]=={}:
@@ -509,6 +525,7 @@ class excelfile:
          
          
     def checkheader(self):
+        self.cache=tree()
         projecttype=self.sht.cell_value(0,0)
         if projecttype != 'PROJECTID':
             raise ValueError("Ukjent prosjekttype (A1)")
@@ -525,12 +542,24 @@ class excelfile:
         self.ShortnameStatus=[]
         ## Regular expression for checking for valid nuclide format
         regexpnuc='^[A-Z]{1,2}([0-9]{1,3}m{0,1}){0,1}(\\_{0,1}[0-9]{0,3}){0,1}(\\#{0,1}[0-9]{0,9}){0,1}$'
+        col=0
         for field,type in zip(self.fields,self.types):
+            col=col+1
         # field: dataHeader[1,]
         # type:  dataHeader[2,]
             valid=0
             param=type.value
-            if param == "METADATA" or param == "BASE":
+            if param == "METADATA":
+                parts=self.parsenuc(field.value)
+                if not parts[0] in self.nucs:
+                    try:
+                        id=self.cachelookup(field.value,"metadatalist")
+                    except IndexError: 
+                        print("Unexpected error:", sys.exc_info()[0])
+                        self.addvalueerror(self.warningUnknownMetadata,col,self.headerRows,field.value)
+                       
+                    
+            elif param == "BASE":
                 param=field.value
             self.cursor.execute(self.sqlValidNoNuc,param)
             valid=self.cursor.fetchall()[0][0]
