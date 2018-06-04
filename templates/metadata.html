@@ -2,26 +2,31 @@
 {% block title %}{{title}}{% endblock %}
 {% block head %}
   {{ super() }}
-  <script type="text/javascript" src="{{ url_for('static', filename='process.js') }}"></script>
+  <script type="text/javascript" src="{{ url_for('static', filename='staticdata.js') }}"></script>
 
 {% endblock %}
 {% block page %}{{title}}{% endblock %}
 {% block heading %}
   {{ super() }}
-{% endblock %}
+  {% endblock %}
 {% block content %}
-   <form action="/metadata" method="post" enctype="multipart/form-data">
-       <p class="formpara"><label for="nameinput">Navn : </label><input name="name" id="nameinput" /></p>
-       <p class="formpara"><label for="shortnameinput">Kortnavn : </label><input name="shortname" id="shortnameinput" /></p>
-       <p class="formpara"><label for="descriptioninput">Beskrivelse : </label><input name="description" id="descriptioninput" /></p>
+<h1>Metadata</h1>
+   <form action="/metadata" method="post" enctype="multipart/form-data">   
+       <p class="formpara"><label for="nameinput">Id : </label><input name="id" id="idinput" readonly="readonly" value="{{ idval }}"/></p>
+       <p class="formpara"><label for="nameinput">Navn : </label><input class="needed" name="name" id="nameinput" value="{{ nameval }}" /></p>
+       <p class="formpara"><label for="shortnameinput">Kortnavn : </label><input class="needed" name="shortname" id="shortnameinput" value="{{ shortname }}"/></p>
+       <p class="formpara"><label for="descriptioninput">Beskrivelse : </label><input class="needed" name="description" id="descriptioninput" value="{{ description }}"/></p>
        <p><input type="submit" id="savedata" name="button" value="{{ sabt }}">
        <input type="submit" id="searchdata" name="button" value="{{ sebt }}"></p>
     </form>
+ {% if error != None %}
+ <h2>{{ error }} </h2>
+ {% endif %}
  {% if dataset != None %}
  <table>
- <tr><th>Id</th><th>Navn</th><th>Kortnavn</th><th>Beskrivelse</th></tr>
+ <tr><th hspan="2">Id</th><th>Navn</th><th>Kortnavn</th><th>Beskrivelse</th></tr>
  {% for row in dataset %}
- <tr>
+ <tr><td><a href="?editid={{row[0]}}">Edit</a></td>
  {%for fld in row %}
  <td>{{fld}}</td>
  {% endfor %}</tr>

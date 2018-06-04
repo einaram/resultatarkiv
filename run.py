@@ -80,16 +80,39 @@ def importdata():
 def metadata():
     searchbuttontext="Søk"
     savebuttontext="Lagre"
+    # TODO: Cleaner implementation!
+    id=""
+    name=""
+    shortname=""
+    description=""
     set=None
+    error=""
     if request.method == 'POST':
         mtdt=metadatalist(req=request.form)
         if searchbuttontext ==  request.form['button']:    
             set=mtdt.search()
         elif savebuttontext == request.form['button']:
-            mtdt.save()
+            md=metadatalist(name=request.form["name"])
+            n=len(md.search(partial=False))
+            md=metadatalist(shortname=request.form["shortname"])
+            print(n)
+            n=n+len(md.search(partial=False))
+            print(n)
+            if n>0:
+                error="eksisterende"
+                print(error)
+            else:
+                mtdt.save()
+                set=mtdt.search()
         else:
             print("Unknown button")
-    return render_template('metadata.html',sebt=searchbuttontext,sabt=savebuttontext,dataset=set)
+        id=request.form["id"]
+        name=request.form["name"]
+        shortname=request.form["shortname"]
+        description=request.form["description"]
+        print(request.form)
+        print(description)
+    return render_template('metadata.html',sebt=searchbuttontext,sabt=savebuttontext,dataset=set,idval=id,nameval=name,shortname=shortname, description=description,error=error)
     
 @app.route("/about")
 def about():

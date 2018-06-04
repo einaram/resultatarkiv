@@ -131,7 +131,7 @@ class excelfile:
 
         self.samplefields=["REF_DATE","SAMPLETYPE","AREAID","COMMENT","SPECIESID","SAMPLESTART","SAMPLESTOP","CONNECT_TO_PARENT","LOCATION","SAMPLEDATE","LATITUDE","LONGITUDE","PARENT_ID"]
 
-        
+
     def fetchlist(self,sql):
         self.cursor.execute(sql)
         list=[]
