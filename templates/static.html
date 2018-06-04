@@ -10,38 +10,12 @@
   {{ super() }}
 {% endblock %}
 {% block content %}
-  <p>Current date/time: {{ current_time | datetimefilter }}</p>
-  <br>
-  <p>File: {{my_string}}</p>
-  <p>md5: {{md5}}</p>
-  <hr />
-  <p>Prosessert fil.</p>
   
    <form action="/importdata" method="post" enctype="multipart/form-data">
       <input type="hidden" name="filepath" value={{ filepath }}>
          <input type="submit" id="importdata" value="Import data">
     </form>
  
-  {% if valueerrors|length >0 %}
-  <h2 id="Errorheader">Feil i data</h2>
-  <p>Feil må rettes eksternt og arket må lastes opp på nytt</p>
-   <table>{% for key, hash in valueerrors.items() %}
-	<tr><th colspan="2">{{ key }}</th></tr> </dt>{% for key, value in hash.items() %}
-	 <tr><td style="white-space: nowrap;">{{ key }} </td>
-     <td>{% for cell  in value %}{{ cell }} {%endfor %}</td>
-     </tr>{% endfor %}
-  {% endfor %}</table> {% endif %}
-  {% if valuewarnings|length >0 %}
-  <h2 id="Warningheader">Warnings on data</h2>
-  <p>Check warnings that should be ignored.</p>
-  <table>{% for key, hash in valuewarnings.items() %}
-	{% set outerloop=loop %}
-    <tr><th colspan="2">{{ key }}</th></tr> </dt>{% for key, value in hash.items() %}
-	 <tr><td style="white-space: nowrap;"><input class="warncheck" type="checkbox" id="Warncheck{{outerloop.index}}{{loop.index}}" /> {{ key }} </td>
-     <td>{% for cell  in value %}{{ cell }} {%endfor %}</td>
-     </tr>{% endfor %}
-  {% endfor %}</table>
-  {% endif %}
   
   {% block footer %}
   {{super()}}

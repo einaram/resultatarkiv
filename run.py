@@ -5,6 +5,7 @@ from werkzeug import secure_filename
 import hashlib
 import platform
 from resark.processexcel import excelfile
+from resark.staticdata import metadatalist
 
 
 if platform.system()=='Windows':
@@ -50,7 +51,7 @@ def upload():
             filename = secure_filename(file.filename)
             file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
             return redirect(url_for('index'))
-  
+
     return render_template('upload.html',  
         title="Upload excel file")
 
@@ -64,7 +65,7 @@ def process():
             file.save(filepath)
             importfile=excelfile(filepath)
             importfile.check()
-    return render_template('process.html', my_string= request.files['file'].filename, filepath=filepath,
+    return render_template('process.html', my_string=request.files['file'].filename, filepath=filepath,
         title="Processing file", current_time=datetime.datetime.now(),
         valuewarnings=importfile.valuewarning,valueerrors=importfile.valueerror,md5=importfile.md5)
 
@@ -75,9 +76,20 @@ def importdata():
     importfile.importdata()
     return render_template('importdata.html', title="Importerer data",filepath=filepath,md5=importfile.md5)
 
-@app.route("/staticdata", methods=['POST','GET'])
-def staticdata():
-    return render_template('static.html')
+@app.route("/metadata", methods=['POST','GET'])
+def metadata():
+    searchbuttontext="Søk"
+    savebuttontext="Lagre"
+    set=None
+    if request.method == 'POST':
+        mtdt=metadatalist(req=request.form)
+        if searchbuttontext ==  request.form['button']:    
+            set=mtdt.search()
+        elif savebuttontext == request.form['button']:
+            mtdt.save()
+        else:
+            print("Unknown button")
+    return render_template('metadata.html',sebt=searchbuttontext,sabt=savebuttontext,dataset=set)
     
 @app.route("/about")
 def about():

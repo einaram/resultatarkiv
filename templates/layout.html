@@ -12,6 +12,10 @@
       .container {
         max-width: 700px;
       }
+      form  { display: table;      }
+	  .formpara     { display: table-row;  }
+      label { display: table-cell; }
+	  input { display: table-cell; }
       h2 {color: red;}
     </style>
   </head>
@@ -30,8 +34,16 @@
 
         <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
           <ul class="nav navbar-nav">
-            {{ nav_link('upload', 'Upload') }}
-            {{ nav_link('about', 'About') }}
+            {{ nav_link('upload', 'Last opp') }}
+            <ul class="nav navbar-nav navbar-right">
+            <li class="dropdown">
+              <a href="#" class="dropdown-toggle" data-toggle="dropdown">Rediger data <b class="caret"></b></a>
+              <ul class="dropdown-menu">
+                {{ nav_link('metadata','Metadatatyper')}}
+                <li><a href="#">Prøvetyper</a></li>
+                <li><a href="#">Subtyper</a></li>
+              </ul>
+            {{ nav_link('about', 'Om') }}
           </ul>
         <!--  <form class="navbar-form navbar-left" role="search">
             <div class="form-group">
