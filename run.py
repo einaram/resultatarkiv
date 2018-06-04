@@ -65,7 +65,7 @@ def process():
             importfile=excelfile(filepath)
             importfile.check()
     return render_template('process.html', my_string= request.files['file'].filename, filepath=filepath,
-        title="Processing file", current_time=datetime.datetime.now(),okheader=importfile.validheader(),
+        title="Processing file", current_time=datetime.datetime.now(),
         valuewarnings=importfile.valuewarning,valueerrors=importfile.valueerror,md5=importfile.md5)
 
 @app.route("/importdata", methods=['POST'] )
@@ -75,7 +75,10 @@ def importdata():
     importfile.importdata()
     return render_template('importdata.html', title="Importerer data",filepath=filepath,md5=importfile.md5)
 
-        
+@app.route("/staticdata", methods=['POST','GET'])
+def staticdata():
+    return render_template('static.html')
+    
 @app.route("/about")
 def about():
     return render_template('about.html', title="About")
