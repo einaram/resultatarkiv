@@ -88,6 +88,7 @@ class excelfile:
         self.errorUnhandeled="Ikke-håndterte data, sjekk at headere er riktige"
         self.warningUnknown="Ny verdi i %s"
         self.warningUnknownMetadata="Ukjent metadatatype"
+        self.headerError="Feil i header"
         
         self.sqlValidNoNuc="select count(shortname) from validData where shortname=? and attrtype!='NUCLIDE'"
         self.sqlValidGetParam="select count(shortname) from validData where shortname=? and attrtype=?"
@@ -127,7 +128,9 @@ class excelfile:
         sql="insert into datafile (filename,md5,imported,analysed) values (?,?,0,0)"
         self.cursor.execute(sql,file,self.md5)
         self.cursor.commit()
-        
+
+        self.samplefields=["REF_DATE","SAMPLETYPE","AREAID","COMMENT","SPECIESID","SAMPLESTART","SAMPLESTOP","CONNECT_TO_PARENT","LOCATION","SAMPLEDATE","LATITUDE","LONGITUDE","PARENT_ID"]
+
         
     def fetchlist(self,sql):
         self.cursor.execute(sql)
@@ -147,8 +150,17 @@ class excelfile:
         else:
             self.cursor.execute(sql,value)
             id=self.cursor.fetchall()[0][0]
+            # Will give an IndexError if noting is returned
             self.cache[table][value]=id
         return(id)
+    
+    def checkexists(self,value,table,sql=None):
+        ret=True
+        try:
+            self.cachelookup(value,table,sql)
+        except IndexError:
+            ret=False
+        return(ret)
     
     def parsenuc(self,value):
         if self.nucs==None:
@@ -185,62 +197,49 @@ class excelfile:
                     sampledata['VALUE'][field.value]=[cell.value,type.value]
                 elif cell.value != "":
                         sampledata[type.value][field.value]=cell.value
-            if True:
+            if False:
                 for item in sampledata:
                     print(item)
                     for key in sampledata[item]:
                         print("...",key,sampledata[item][key])
             sample=sampledata["BASE"]
-            print(sample)
-            samplefields=["REF_DATE","SAMPLETYPE","AREAID","COMMENT","SPECIESID","SAMPLESTART","SAMPLESTOP","CONNECT_TO_PARENT","LOCATION","SAMPLEDATE"]
-            for field in samplefields:
+            for field in self.samplefields:
                 if not (field in sample) or sample[field]==None:
-                    print("--",field,"--")
                     sample[field]=None
                 else:
                     if field=="SAMPLETYPE":
                         sample[field]=self.cachelookup(sample[field],"sampletypelist")
-                    if field=="CONNECT_TO_PARENT":
-                        print(sample[field])
-                        print(sampleset)
-                        sample["CONNECT_TO_PARENT"]=sampleset[sample[field]]
+                    if field=="CONNECT_TO_PARENT" and sample[field] != "":
+                        if sample[field] in sampleset:
+                            sample["CONNECT_TO_PARENT"]=sampleset[sample[field]]
             #TODO: Look into proper parameterization of lat and lon in STGeomFromText
-            if "LATITUDE" in sample:
+            if "LATITUDE" in sample and sample["LATITUDE"]!= None and sample["LATITUDE"]>0:
                 location="geometry::STGeomFromText('POINT ("+str(sample["LONGITUDE"])+" "+str(sample["LATITUDE"])+")',4326)"
             else:
                 location="null"
             samplesql="insert into sample(projectid,reftime,sampletype,areaid,comment,speciesid,samplestart,samplestop,parentsampleid,location,sample_date) values(?,?,?,?,?,?,?,?,?,"+location+",?)"
-            print(samplesql)
-            print(sample)
+            # print(samplesql)
+            # print(sample)
             self.cursor.execute(samplesql,projectid,sample["REF_DATE"],sample["SAMPLETYPE"],sample["AREAID"],sample["COMMENT"],sample["SPECIESID"],sample["SAMPLESTART"],sample["SAMPLESTOP"],sample["CONNECT_TO_PARENT"],sample["SAMPLEDATE"])
             self.cursor.execute("SELECT max(id) from sample")
             sampleid=self.cursor.fetchall()[0][0]
             if "PARENT_ID" in sample:
-                print("\n\n")
-                print("Legger inn i partentoppslag")
-                print(sample["PARENT_ID"])
                 sampleset[sample["PARENT_ID"]]=sampleid
-                print(sampleset)
-                print(sampleid)
             sql="insert into samplemetadata(sampleid,value,metadataid) values(?,?,?)"
             for item in sampledata["METADATA"]:
-                print(item)
                 value=sampledata["METADATA"][item]
-                print(value)
                 metadataid=self.cachelookup(item,"metadatalist")
                 self.cursor.execute(sql,sampleid,value,metadataid)
-                self.cursor.execute("SELECT max(id) from samplemetadata")
-                print(self.cursor.fetchall()[0][0])
+            #    self.cursor.execute("SELECT max(id) from samplemetadata")
+            #    print(self.cursor.fetchall()[0][0])
             for item in sampledata["VALUE"]:
                 sql="insert into samplevalue(sampleid,value,quantityid,unitid) values(?,?,?,?)"
-                print(item)
                 value=sampledata["VALUE"][item]
-                print(value)
                 quantityid=self.cachelookup(item,"quantitylist")
                 unitid=self.cachelookup(value[1],"unitlist")
                 self.cursor.execute(sql,sampleid,value[0],quantityid,unitid)
-                self.cursor.execute("SELECT max(id) from samplevalue")
-                print(self.cursor.fetchall()[0][0])
+            #    self.cursor.execute("SELECT max(id) from samplevalue")
+            #    print(self.cursor.fetchall()[0][0])
             for item in sampledata["NUCS"]:
                 sql="insert into samplevalue(sampleid,value,unitid,unc_value,unc_unitid,mda_value,mda_unitid,laboratory,comment,quantityid,nuclideid,instrument,uncmeasure,below_mda) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
                 value=None
@@ -277,60 +276,56 @@ class excelfile:
                         elif param=="COMMENT":
                             comment=values[0]
                         elif param=="UNCMEASURE":
-                            uncmeasure=param[0]
+                            uncmeasure=values[0]
                         elif values[1]=="INSTRUMENT":
                             instrument=values[0]
                         elif values[1]=="BELOW_MDA":
                             below_mda=values[0]
-                    print(comment)
-                    print(laboratory)
-                    print(sampleid)
-                    print(value)
                     self.cursor.execute(sql,sampleid,value,unitid,unc_value,unc_unitid,mda_value,mda_unitid,laboratory,comment,quantityid,nuclideid,instrument,uncmeasure,below_mda)    
-                    self.cursor.execute("SELECT max(id) from samplevalue")
-                    print(self.cursor.fetchall()[0][0])
-            self.cursor.execute("update datafile set imported=1 where filename=? and md5 = ?",self.file,self.md5)
-            self.cursor.commit()
+            #        self.cursor.execute("SELECT max(id) from samplevalue")
+            #        print(self.cursor.fetchall()[0][0])
+            print(row)    
+        self.cursor.execute("update datafile set imported=1 where filename=? and md5 = ?",self.file,self.md5)
+        self.cursor.commit()
             
     
 
     
     def check(self):
-        self.ShortnameStatus=[]
         self.checkheader()
-        if self.validheader:
-            self.checkdata()
+        self.checkdata()
     
     def checkItem(self,type,shortname,cell,sql,col,row,message,emptyOK=True,warning=True,extraparam=None):
         seen = False
         valid = False
-        if cell.value in self.lookup[type][shortname]:
-            valid=self.lookup[type][shortname][cell.value]==1
+        if cell.ctype==xlrd.XL_CELL_NUMBER and str(cell.value).endswith(".0"):
+            value=str(int(cell.value))
+        else:
+            value=str(cell.value)
+        if value in self.lookup[type][shortname]:
+            valid=self.lookup[type][shortname][value]==1
             seen = True
-        valid = valid or ((cell.ctype==xlrd.XL_CELL_EMPTY or cell.value=="" )and emptyOK)
+        valid = valid or ((cell.ctype==xlrd.XL_CELL_EMPTY or value=="" )and emptyOK)
         if not (seen or valid):
             if extraparam==None:
-                self.cursor.execute(sql,cell.value)
+                self.cursor.execute(sql,value)
             else:
-                self.cursor.execute(sql,cell.value,extraparam)
+                self.cursor.execute(sql,value,extraparam)
             valid=(self.cursor.fetchall()[0][0]>0)    
         if not valid:
             if warning:
-                self.addvaluewarning(message,col,row,cell.value)
+                self.addvaluewarning(message,col,row,value)
             else:
-                self.addvalueerror(message,col,row,cell.value)
-            self.lookup[type][shortname][cell.value]=-1
+                self.addvalueerror(message,col,row,value)
+            self.lookup[type][shortname][value]=-1
         else:
-            self.lookup[type][shortname][cell.value]=1
+            self.lookup[type][shortname][value]=1
     
     
     
 
     
     def checkdata(self):
-        if len(self.ShortnameStatus)==0:
-            raise ValueError(self.InvalidProjectid)
-        # Jumps out if either the header has not been processed or it has errors
         col=0
         validvalues=[]
         valueerror={}
@@ -339,8 +334,7 @@ class excelfile:
         parentdata=[]
         nonhandeled=0
         units=[]
-        allowNewValues=["SAMPLEID","LIMSNR","WEEKNR"] # Will accept new values for metadata
-        
+        allowNewValues=["SAMPLEID","LIMSNR","WEEKNR"] # Will accept new values for metadata - this should be in the data base table
         sql="select shortname from unitlist"
         for row in self.cursor.execute(sql):
             units.append(row[0])
@@ -451,8 +445,14 @@ class excelfile:
                     # Valid if value for metadata has been seen before
                     # Need a warning for new value, invalid for new key
                     # print(colname(col),row)
+                    nuc=self.parsenuc(shortname.value)
+                    if nuc[0] in self.nucs:
+                        print(nuc)
                     seen=False
-                    value=cell.value
+                    if cell.ctype==xlrd.XL_CELL_NUMBER and str(cell.value).endswith('.0'):
+                        value=str(int(cell.value))
+                    else:
+                        value=str(cell.value)
                     if value in lookup["METADATA"][shortname.value]:
                         valid=lookup["METADATA"][shortname.value][value]==1
                         seen=True
@@ -522,114 +522,61 @@ class excelfile:
         else:
             self.valuewarning[key][value].append(cellid)
          
-         
-         
+            
     def checkheader(self):
         self.cache=tree()
         projecttype=self.sht.cell_value(0,0)
         if projecttype != 'PROJECTID':
-            raise ValueError("Ukjent prosjekttype (A1)")
+            self.addvalueerror("Feil verdi",0,0,projecttype)
             # TODO: Define project in import file
         self.projectid=self.sht.cell_value(1,0)
         sql="select name from projects where id = ?"
         self.cursor.execute(sql,self.projectid)
         rows=self.cursor.fetchall()
         if len(rows)==0:
-            raise ValueError(self.InvalidProjectid)
+            self.addvalueerror("Ukjent prosjektid",1,0,self.projectid)
         self.project=rows[0][0]
         if self.sht.cell_value(2,0) != "":
-            raise ValueError(self.ExpectedBlank)
+            self.addvalueerror(ExpectedBlank,2,0,self.sht.cell_value(2,0))
         self.ShortnameStatus=[]
         ## Regular expression for checking for valid nuclide format
         regexpnuc='^[A-Z]{1,2}([0-9]{1,3}m{0,1}){0,1}(\\_{0,1}[0-9]{0,3}){0,1}(\\#{0,1}[0-9]{0,9}){0,1}$'
         col=0
         for field,type in zip(self.fields,self.types):
-            col=col+1
         # field: dataHeader[1,]
         # type:  dataHeader[2,]
             valid=0
             param=type.value
-            if param == "METADATA":
+            if type.value == "METADATA":
                 parts=self.parsenuc(field.value)
                 if not parts[0] in self.nucs:
                     try:
                         id=self.cachelookup(field.value,"metadatalist")
                     except IndexError: 
-                        print("Unexpected error:", sys.exc_info()[0])
                         self.addvalueerror(self.warningUnknownMetadata,col,self.headerRows,field.value)
-                       
-                    
-            elif param == "BASE":
-                param=field.value
-            self.cursor.execute(self.sqlValidNoNuc,param)
-            valid=self.cursor.fetchall()[0][0]
-            if type.value == 'AREAID':
-                self.cursor.execute(self.sqlValidGetParam,param, "AREA")
-                valid=self.cursor.fetchall()[0][0]
-            if valid == 0:
-                self.cursor.execute(self.sqlValidGetParam,param, "QUANTITY")
-                n=self.cursor.fetchall()[0][0]
-                if n==1:
-                    self.cursor.execute(self.sqlValidGetParam,type.value, "UNIT")
-                    valid=self.cursor.fetchall()[0][0]
-                
-            # Valid should be either 1 or 0 - depending if the shortname exists or not.
-            nuclide=False
-            if valid == 0: # Probably nuclide
-                nuclide=True
-                c_nucl=""
-                nucl=field.value.split("_")
-                if len(nucl)==3:
-                    c_nucl = nucl[0]+"_"+nucl[1]
-                    c_ctrl = nucl[2]
-                elif len(nucl)==1:
-                    c_nucl=nucl[0]
-                    c_ctrl=None 
-                else:
-                    self.cursor.execute(self.sqlValidGetParam,nucl[1], "VALUE")
-                    validnuc=self.cursor.fetchall()[0][0]
-                    if validnuc ==1:
-                        c_nucl=nucl[0]
-                        c_ctrl=nucl[1]
-                    else:
-                        c_nucl = nucl[0]+"_"+nucl[1]
-                        c_ctrl = None
-                # print("nucl:",nucl)
-                # print("c_nucl:",c_nucl)
-                m=re.search(regexpnuc,c_nucl)
-                if m != None:
-                    basenuc=c_nucl.split("#")
-                    self.cursor.execute(self.sqlValidGetParam,basenuc[0], "NUCLIDE")
-                    validnuc=self.cursor.fetchall()[0][0]
-                    if validnuc == 1:
-                        if c_ctrl == None:
-                            current_nuclide=c_nucl
-                            self.cursor.execute(self.sqlValidGetParam,type.value, "UNITS")
-                            valid=self.cursor.fetchall()[0][0]
-                        else:
-                           # if current_nuclide == c_nucl: # This is a bug, this will never be true
-                            self.cursor.execute(self.sqlValidGetParam,c_ctrl, "VALUE") 
-                            valid=self.cursor.fetchall()[0][0]
-                 #   print(basenuc)
-                else:
-                    valid=0
-                    nuclide=False
-            self.ShortnameStatus.append(valid)
-            self.nuclide.append(nuclide)
-            #print(field.value,type.value,valid)
-        #print(self.ShortnameStatus)
-        # print(self.nuclide)
-
-    def validheader(self):
-        valid = len(self.ShortnameStatus) > 0
-        valid = valid and not 0 in self.ShortnameStatus
-        return valid
-        
-    def validdata(self):
-        valid = len(self.validvalues) > 0
-        valid = valid and self.validvalues.count(False) == 0
-        return valid
-        
+                # What to expect after nuc?
+            elif type.value == "BASE":
+                if not field.value in self.samplefields:
+                    self.addvalueerror("Ukjent sample felt",col,self.headerRows,field.value)
+            elif type.value == 'AREAID':
+                self.cursor.execute("select count(id) from GeoAreas where objtype = ?",field.value)
+                number=self.cursor.fetchall()[0][0]
+                if number == 0:
+                    self.addvalueerror("Ukjent arealtype",col,self.headerRows,field.value)
+            elif self.checkexists(type.value,"unitlist"):
+                if not self.checkexists(field.value,"QuantityList"):
+                    parts=self.parsenuc(field.value)
+                    if not parts[0] in self.nucs:
+                        self.addvalueerror("Ukjent parameter",col,self.headerRows,field.value)
+            elif type.value in ['LABORATORY','UNCMETHOD']:
+                parts=self.parsenuc(field.value)
+                if not parts[0] in self.nucs:
+                    self.addvalueerror("Ukjent parameter",col,self.headerRows,field.value)
+            else:
+                self.addvalueerror(self.headerError,col,self.headerRows,field.value)
+    
+            col=col+1
+    
     def debug(self):
         print(self.project)
         print(self.md5)
