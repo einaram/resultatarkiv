@@ -34,7 +34,18 @@ class dbconnector:
         sql="select column_name,is_nullable,data_type,character_maximum_length from information_schema.columns where table_name=?"
         self.columns=self.fetchdict(sql,(self.tablename))
         
-        
+    def hash(self):
+        if self.columns==None:
+            self.getcolumns()
+        d={}
+        for k in self.columns:
+            col=k['column_name']
+            try:
+                d[col]=getattr(self,col)
+            except AttributeError:
+                d[col]=None
+        return d
+    
     def search(self):
         True
     
