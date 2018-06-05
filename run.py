@@ -33,16 +33,33 @@ def datetimefilter(value, format='%Y/%m/%d %H:%M'):
 
 app.jinja_env.filters['datetimefilter'] = datetimefilter
 
+
 @app.route("/")
 def template_test():
     return render_template('template.html', my_string=request.environ.get('REMOTE_USER'), 
         my_list=[], title="Resultatarkiv", current_time=datetime.datetime.now())
 
         
-@app.route("/search")
+@app.route("/search", methods=['GET', 'POST'])
 def search():
+    print(request.path)
     searchbuttontext="Søk"
-    return render_template('search.html',sebt=searchbuttontext)
+    savebuttontext="Lagre"
+    set=None
+    req={}
+    error=""
+    table=""
+    if request.method == 'POST':
+        if searchbuttontext ==  request.form['button']:    
+            True
+        else:
+            print("Unknown button")
+        print(request.form)
+    else:
+        True
+    fields=None
+    return render_template('search.html',path=request.path,sebt=searchbuttontext,dataset=set,error=error,table=table,fields=fields,req=request.form,title="Datasøk")
+#    return render_template('search.html',sebt=searchbuttontext)
         
 @app.route("/home")
 def home():

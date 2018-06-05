@@ -2,8 +2,7 @@
 {% block title %}{{title}}{% endblock %}
 {% block head %}
   {{ super() }}
-  <script type="text/javascript" src="{{ url_for('static', filename='staticdata.js') }}"></script>
-
+  <script type="text/javascript" src="{{ url_for('static', filename='search.js') }}"></script>
 {% endblock %}
 {% block page %}{{title}}{% endblock %}
 {% block heading %}
@@ -11,10 +10,12 @@
   {% endblock %}
 {% block content %}
    <form action="{{path}}" method="post" enctype="multipart/form-data">
+       <p class="formpara"><label for="{{field}}input">{{field|title}} : </label><input name="{{field}}" id="{{field}}input" {{ro}} value="{{req[field]}}"/></p>
+       
        <p><input type="submit" id="searchdata" name="button" value="{{ sebt }}"></p>
     </form>
  {% if error != None %}
- <h2>{{ error }} </h2>
+ <h2>{{ error }}</h2>
  {% endif %}
  {% if dataset != None %}
  <table border="1" cellpadding="5" cellspacing="0" style="border-collapse:collapse;">
