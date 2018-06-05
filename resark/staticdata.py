@@ -6,13 +6,10 @@ class metadatalist:
         self.tablename=tablename
         if req !=None:
             for k,v in req.items():
-                setattr(self,k,v)
-            for k in ('name','shortname','description'):
-                try:
-                    if getattr(self,k)=='':
-                        setattr(self,k,None)
-                except AttributeError:
+                if v=='':
                     setattr(self,k,None)
+                else:
+                    setattr(self,k,v)
         else:
             self.name=name
             self.shortname=shortname
@@ -52,8 +49,7 @@ class metadatalist:
         self.columns=self.fetchdict(sql,(self.tablename))
         
         
-        
-    def fields(self):
+    def hash(self):
         d={}
         for k in self.columns:
             col=k['column_name']
@@ -69,7 +65,8 @@ class metadatalist:
             self.connecttodb()
         fields=[]
         values=[]
-        for k,v in self.fields().items():
+        for k,v in self.hash().items():
+            print(k,v)
             if v != None:
                 if partial:
                     fields.append(k+" like ?")
@@ -81,14 +78,21 @@ class metadatalist:
         sql = "select id,"+",".join(self.dynfields()) +" from "+self.tablename
         if len(values)>0:
             sql=sql+" where "+(" and ".join(fields))
+        print(sql)
+        print(values)
         self.cursor.execute(sql,values)
         set = self.cursor.fetchall()
         return(set)
     
     def dynfields(self):
-        fields=list(self.fields().keys())
+        fields=list(self.hash().keys())
         fields.remove('id')
         return(fields)
+        
+    def fields(self):
+        if self.cursor==None:   
+            self.connecttodb()
+        return(list(self.hash().keys()))
         
     def save(self):
         if self.cursor==None:   

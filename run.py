@@ -76,44 +76,65 @@ def importdata():
     importfile.importdata()
     return render_template('importdata.html', title="Importerer data",filepath=filepath,md5=importfile.md5)
 
+@app.route("/project", methods=['POST','GET']) 
+def project():
+    return staticdata("projects")
+    
+@app.route("/quantity", methods=['POST','GET']) 
+def quantity():
+    return staticdata("quantitylist")
+    
 @app.route("/metadata", methods=['POST','GET'])
 def metadata():
+    return staticdata("metadatalist")
+
+@app.route("/nuclide", methods=['POST','GET'])
+def nuclide():
+    return staticdata("nuclidelist")
+
+@app.route("/sampletype", methods=['POST','GET'])
+def sampletype():
+    return staticdata("sampletypelist")
+    
+@app.route("/species", methods=['POST','GET'])
+def species():
+    return staticdata("specieslist")
+    
+def staticdata(table):  
+    print(request.path)
+    print(table)
     searchbuttontext="Søk"
     savebuttontext="Lagre"
-    # TODO: Cleaner implementation!
-    id=""
-    name=""
-    shortname=""
-    description=""
     set=None
     error=""
     if request.method == 'POST':
-        mtdt=metadatalist('metadatalist',req=request.form)
+        mtdt=metadatalist(table,req=request.form)
         if searchbuttontext ==  request.form['button']:    
             set=mtdt.search()
         elif savebuttontext == request.form['button']:
-            md=metadatalist('metadatalist',name=request.form["name"])
+            md=metadatalist(table,name=request.form["name"])
             n=len(md.search(partial=False))
-            md=metadatalist('metadatalist',shortname=request.form["shortname"])
-            print(n)
-            n=n+len(md.search(partial=False))
+            try:
+                md=metadatalist(table,shortname=request.form["shortname"])
+                print(n)
+                n=n+len(md.search(partial=False))
+            except AttributeError:
+                True # Just ignore it
             print(n)
             if n>0:
                 error="eksisterende"
-                print(error)
             else:
                 mtdt.save()
                 set=mtdt.search()
         else:
             print("Unknown button")
-        id=request.form["id"]
-        name=request.form["name"]
-        shortname=request.form["shortname"]
-        description=request.form["description"]
         print(request.form)
-        print(description)
-    return render_template('metadata.html',sebt=searchbuttontext,sabt=savebuttontext,dataset=set,idval=id,nameval=name,shortname=shortname, description=description,error=error)
-    
+    else:
+        mtdt=metadatalist(table)
+    fields=mtdt.fields()
+    return render_template('metadata.html',path=request.path,sebt=searchbuttontext,sabt=savebuttontext,dataset=set,error=error,table=table,fields=fields,req=request.form,title=table.title())
+
+   
 @app.route("/about")
 def about():
     return render_template('about.html', title="About")
