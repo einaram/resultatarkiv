@@ -24,9 +24,9 @@
  {% endif %}
  {% if dataset != None %}
  <table>
- <tr><th hspan="2">Id</th><th>Navn</th><th>Kortnavn</th><th>Beskrivelse</th></tr>
+ <tr><th hspan="1">Id</th><th>Navn</th><th>Kortnavn</th><th>Beskrivelse</th></tr>
  {% for row in dataset %}
- <tr><td><a href="?editid={{row[0]}}">Edit</a></td>
+ <tr><!--<td><a href="?editid={{row[0]}}">Edit</a></td>-->
  {%for fld in row %}
  <td>{{fld}}</td>
  {% endfor %}</tr>
