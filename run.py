@@ -88,13 +88,13 @@ def metadata():
     set=None
     error=""
     if request.method == 'POST':
-        mtdt=metadatalist(req=request.form)
+        mtdt=metadatalist('metadatalist',req=request.form)
         if searchbuttontext ==  request.form['button']:    
             set=mtdt.search()
         elif savebuttontext == request.form['button']:
-            md=metadatalist(name=request.form["name"])
+            md=metadatalist('metadatalist',name=request.form["name"])
             n=len(md.search(partial=False))
-            md=metadatalist(shortname=request.form["shortname"])
+            md=metadatalist('metadatalist',shortname=request.form["shortname"])
             print(n)
             n=n+len(md.search(partial=False))
             print(n)
