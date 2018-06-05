@@ -38,6 +38,12 @@ def template_test():
     return render_template('template.html', my_string=request.environ.get('REMOTE_USER'), 
         my_list=[], title="Resultatarkiv", current_time=datetime.datetime.now())
 
+        
+@app.route("/search")
+def search():
+    searchbuttontext="Søk"
+    return render_template('search.html',sebt=searchbuttontext)
+        
 @app.route("/home")
 def home():
     return render_template('template.html', my_string="Foo", 
@@ -79,6 +85,19 @@ def importdata():
 @app.route("/project", methods=['POST','GET']) 
 def project():
     return staticdata("projects")
+
+ 
+@app.route("/habitat", methods=['POST','GET']) 
+def habitat():
+    return staticdata("habitatlist")
+
+@app.route("/samplecat", methods=['POST','GET']) 
+def samplecat():
+    return staticdata("samplecatlist")
+
+@app.route("/topic", methods=['POST','GET']) 
+def topic():
+    return staticdata("topiclist")
     
 @app.route("/quantity", methods=['POST','GET']) 
 def quantity():

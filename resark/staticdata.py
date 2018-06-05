@@ -1,6 +1,9 @@
 import pyodbc 
 
 class metadatalist:
+
+#TODO: Presenter og editer data med foreign key-kobling
+
     
     def __init__(self,tablename,name=None,shortname=None,description=None,id=None,req=None):
         self.tablename=tablename
