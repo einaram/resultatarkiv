@@ -52,6 +52,7 @@
                 {{ nav_link('habitat','Habitater')}}              
               </ul>
             {{ nav_link('logout','Logg ut')}}
+            {{ nav_link('user',current_user.name)}}
             {%else%}
             {{nav_link('login','Logg inn')}}
             {%endif%}
@@ -75,7 +76,6 @@
       </div><!-- /.container-fluid -->
     </nav>
     <div class="container">
-    <p>{{ current_user.name }}</p>
       {% block heading %}
         <h1>{% block page %}{% endblock %}</h1>
       {% endblock %}

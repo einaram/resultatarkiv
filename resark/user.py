@@ -12,6 +12,9 @@ class User(UserMixin,dbconnector):
         self.authenticated=False
         self.connecttodb()
         self.name=None
+        self.email=None
+        self.pw_hash=None
+        self.userclass=0
         u=None
         try:
             self.cursor.execute("select username,fullname,email,hashedpassword,userclass from users where username =? ",self.id)
@@ -20,12 +23,8 @@ class User(UserMixin,dbconnector):
             self.email=u[0][2]
             self.pw_hash=u[0][3]
             self.userclass=u[0][4]
-            self.authenticated= len(u)==1
-        except pyodbc.DataError:
-            print(self.id)
-            pass
         except IndexError:
-            self.authenticated=False
+            pass
         self.password = None
         print(self)
     
@@ -39,4 +38,10 @@ class User(UserMixin,dbconnector):
         self.pw_hash = generate_password_hash(password)
 
     def check_password(self, password):
-        return check_password_hash(self.pw_hash, password)
+        ok=False
+        if self.pw_hash==None:
+            return False
+        if self.pw_hash.startswith('sha'):
+            return check_password_hash(self.pw_hash, password)
+        else: # need a fallback until implementation is finished. 
+            return self.pw_hash==password

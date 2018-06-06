@@ -60,9 +60,16 @@ app.jinja_env.filters['datetimefilter'] = datetimefilter
     
 @app.route("/None")
 @app.route("/")
+
 def home():
     return render_template('template.html',title="Resultatarkiv")
 
+@app.route("/user")
+@login_required
+def user():
+    return render_template('template.html',title="Brukerinnstillinger")
+    
+    
 # somewhere to login
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -70,8 +77,9 @@ def login():
         username = request.form['username']
         password = request.form['password']
         db=dbconnector()
-        if db.checkuser(username,password):
-            user = User(username)
+        user = User(username)
+        # if db.checkuser(username,password):
+        if user.check_password(password):
             login_user(user)
             return redirect(request.args.get("next"))
         else:
