@@ -11,3 +11,11 @@ create table datafile(
  md5 varchar(64) not null,
  analysed bit not null default 0,
  imported bit not null default 0);
+ 
+ 
+ create table users(
+  username varchar(40) not null primary key,
+  fullname varchar(255) not null,
+  email varchar(255),
+  password varchar(255),
+  userclass integer not null default 0);

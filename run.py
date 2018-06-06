@@ -8,20 +8,12 @@ import hashlib
 import platform
 from resark.processexcel import excelfile
 from resark.staticdata import metadatalist
-
-class User(UserMixin):
-
-    def __init__(self, id):
-        self.id = id
-        self.name = "user" + str(id)
-        self.password = self.name + "_secret"
-        
-    def __repr__(self):
-        return "%d/%s/%s" % (self.id, self.name, self.password)
-
+from resark.user import User
+from resark.dbconnector import dbconnector
 
 # For testing ... create some users with ids 1 to 20       
-users = [User(id) for id in range(1, 21)]
+# users = [User(id) for id in range(1, 21)]
+# users.append(User('mortens'))
 
 
 if platform.system()=='Windows':
@@ -44,6 +36,9 @@ app.jinja_env.lstrip_blocks = True
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = "login"
+@login_manager.user_loader
+def load_user(user_id):
+    return User.get(user_id)
 
 def allowed_file(filename):
     return '.' in filename and \
@@ -62,9 +57,6 @@ def datetimefilter(value, format='%Y/%m/%d %H:%M'):
 app.jinja_env.filters['datetimefilter'] = datetimefilter
 
 
-@login_manager.user_loader
-def load_user(user_id):
-    return User.get(user_id)
     
 @app.route("/None")
 @app.route("/")
@@ -76,22 +68,14 @@ def home():
 def login():
     if request.method == 'POST':
         username = request.form['username']
-        password = request.form['password']        
-        if password == username + "_secret":
-            id = username.split('user')[1]
-            user = User(id)
+        password = request.form['password']
+        db=dbconnector()
+        if db.checkuser(username,password):
+            user = User(username)
             login_user(user)
             return redirect(request.args.get("next"))
         else:
             return abort(401)
-    elif False:
-        return Response('''
-        <form action="" method="post">
-            <p><input type=text name=username>
-            <p><input type=password name=password>
-            <p><input type=submit value=Login>
-        </form>
-        ''')
     else:
         return render_template("login.html")
 
@@ -232,7 +216,6 @@ def staticdata(table):
             n=len(md.search(partial=False))
             try:
                 md=metadatalist(table,shortname=request.form["shortname"])
-                print(n)
                 n=n+len(md.search(partial=False))
             except AttributeError:
                 True # Just ignore it
@@ -240,11 +223,11 @@ def staticdata(table):
             if n>0:
                 error="eksisterende"
             else:
+# TODO: Flytt konrollen av om det eksisterer over i mtdt.save
                 mtdt.save()
                 set=mtdt.search()
         else:
             print("Unknown button")
-        print(request.form)
     else:
         mtdt=metadatalist(table)
     fields=mtdt.fields()
@@ -255,12 +238,17 @@ def staticdata(table):
 def about():
     return render_template('about.html', title="About")
 
-
 @app.errorhandler(404)
-def page_not_found(e):
-    return render_template('htmlerror.html'), 404
+def page_not_found2(e):
+    return Response('<p>Denne siden finnes ikke...</p><p><a href="/">Tilbake</a>')
+    #return render_template('htmlerror.html')
         
 
+# handle login failed
+@app.errorhandler(401)
+def page_not_found(e):
+    return Response('<p>Ugyldig bruker</p><p><a href="/">Tilbake</a>')
+    
 if __name__ == '__main__':
         
     app.secret_key = os.urandom(12)

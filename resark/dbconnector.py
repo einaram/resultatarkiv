@@ -8,7 +8,23 @@ class dbconnector:
 
 
     def __init__(self):
+        self.cursor=None
         pass
+    def checkuser(self,username,password):
+        if self.cursor==None:
+            self.connecttodb()
+        authOK=False
+        try:
+            self.cursor.execute("select username,fullname,email,hashedpassword from users where username =? and hashedpassword=?",username,password)
+            u=self.cursor.fetchall()
+            authOK= len(u)==1
+        except pyodbc.DataError:
+            authOK=False
+        except IndexError:
+            authOK=False
+        return(authOK)
+
+        
     def fetchlist(self,sql):
         self.cursor.execute(sql)
         list=[]
