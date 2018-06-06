@@ -9,6 +9,17 @@ class dbconnector:
 
     def __init__(self):
         pass
+    def fetchlist(self,sql):
+        self.cursor.execute(sql)
+        list=[]
+        row = self.cursor.fetchone()
+        while row is not None:
+            list.append(row[0])
+            row = self.cursor.fetchone()     
+        return(list)
+    
+        
+        
     def fetchdict(self,sql,params=None):
         if params==None:
             self.cursor.execute(sql)
@@ -29,10 +40,14 @@ class dbconnector:
                       connectstring
                       )
         self.cursor = cnxn.cursor()
+        print("connecting ",self.server)
     
-    def getcolumns(self):
+    
+    def getcolumns(self,table=None):
+        if table==None:
+            table=self.tablename
         sql="select column_name,is_nullable,data_type,character_maximum_length from information_schema.columns where table_name=?"
-        self.columns=self.fetchdict(sql,(self.tablename))
+        self.columns=self.fetchdict(sql,(table))
         
     def hash(self):
         if self.columns==None:

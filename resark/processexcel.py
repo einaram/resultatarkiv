@@ -3,12 +3,14 @@ import xlrd
 from xlrd.sheet import ctype_text 
 import platform
 import hashlib
-import pyodbc 
 import re
 import collections
 import time
 import sys
 import datetime
+
+from .dbconnector import *
+
 
 
 # Valid excel?
@@ -62,7 +64,7 @@ def tree():
     # Makes handling of multidimentional dicts easier
     
 
-class excelfile:
+class excelfile(dbconnector):
     def __init__(self,file):
         self.file=file
         self.InvalidHeaderUnit = "Header '%s', column %i, has wrong unit. Is '%s' but this is not registered as a valid unit."
@@ -103,14 +105,7 @@ class excelfile:
         
         self.nuclide=[]
         self.ShortnameStatus=[]
-        self.server="Server=NRPA-3220\\SQLEXPRESS;"
-        self.database="DataArkiv"
-        #self.server="Server=databasix2\\databasix2;"
-        connectstring="Driver={SQL Server Native Client 11.0};"+self.server+"Database="+self.database+";"+"Trusted_Connection=yes;Autocommit=False"
-        cnxn = pyodbc.connect(
-                      connectstring
-                      )
-        self.cursor = cnxn.cursor()
+        
         self.valuewarning=tree()
         self.valueerror=tree()
         self.SEENBEFORE=1
@@ -124,23 +119,17 @@ class excelfile:
         self.lookup=tree()
         self.dateFormat=None
         self.nucs=None
+        
         self.md5=md5sum(self.file)
+        self.connecttodb()
         sql="insert into datafile (filename,md5,imported,analysed) values (?,?,0,0)"
         self.cursor.execute(sql,file,self.md5)
         self.cursor.commit()
+        self.samplefields=self.fetchlist("select Shortname FROM BasisPropertiesList where attrtype = 'BASE'")
+        
+        
 
-        self.samplefields=["REF_DATE","SAMPLETYPE","AREAID","COMMENT","SPECIESID","SAMPLESTART","SAMPLESTOP","CONNECT_TO_PARENT","LOCATION","SAMPLEDATE","LATITUDE","LONGITUDE","PARENT_ID"]
-
-
-    def fetchlist(self,sql):
-        self.cursor.execute(sql)
-        list=[]
-        row = self.cursor.fetchone()
-        while row is not None:
-            list.append(row[0])
-            row = self.cursor.fetchone()     
-        return(list)
-    
+   
     def cachelookup(self,value,table,sql=None):
         if sql==None:
             sql="select id from "+table+" where shortname=?"

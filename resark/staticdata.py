@@ -70,7 +70,6 @@ class metadatalist(dbconnector):
     def save(self):
         if self.cursor==None:   
             self.connecttodb()
-        
         fields=self.dynfields()
         sql="insert into "+self.tablename +"("+",".join(fields)+") values("+",".join('?'*len(fields)) +")"
         param=[]
