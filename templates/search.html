@@ -9,8 +9,19 @@
   {{ super() }}
   {% endblock %}
 {% block content %}
+{{selected}}
    <form action="{{path}}" method="post" enctype="multipart/form-data">
-       <p class="formpara"><label for="{{field}}input">{{field|title}} : </label><input name="{{field}}" id="{{field}}input" {{ro}} value="{{req[field]}}"/></p>
+       <p class="formpara"><label for="sampletype">Prøvetype : </label><select name="sampletype" id="sampletype" >
+       <option value="0" ></option>
+    {% for type in types %}
+        {% if type[0] == selected %}
+        {% set sel='SELECTED="SELECTED"' %}
+        {% else %}
+        {% set sel=''%}
+        {% endif %}
+        <option value="{{type[0]}}" {{sel}}>{{type[1]}}</option>
+    {% endfor %}
+</select>
        
        <p><input type="submit" id="searchdata" name="button" value="{{ sebt }}"></p>
     </form>

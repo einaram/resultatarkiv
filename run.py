@@ -8,13 +8,9 @@ import hashlib
 import platform
 from resark.processexcel import excelfile
 from resark.staticdata import metadatalist
+from resark.searchdata import searchdata
 from resark.user import User
 from resark.dbconnector import dbconnector
-
-# For testing ... create some users with ids 1 to 20       
-# users = [User(id) for id in range(1, 21)]
-# users.append(User('mortens'))
-
 
 if platform.system()=='Windows':
 	UPLOAD_FOLDER = 'c:/windows/temp/'
@@ -43,10 +39,7 @@ def load_user(user_id):
 def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1] in ALLOWED_EXTENSIONS
-
-
-
-           
+  
            
            
 @app.template_filter()
@@ -60,7 +53,6 @@ app.jinja_env.filters['datetimefilter'] = datetimefilter
     
 @app.route("/None")
 @app.route("/")
-
 def home():
     return render_template('template.html',title="Resultatarkiv")
 
@@ -78,7 +70,6 @@ def login():
         password = request.form['password']
         db=dbconnector()
         user = User(username)
-        # if db.checkuser(username,password):
         if user.check_password(password):
             login_user(user)
             return redirect(request.args.get("next"))
@@ -94,8 +85,7 @@ def login():
 def logout():
     logout_user()
     return redirect("/")
-
-
+    
 # handle login failed
 @app.errorhandler(401)
 def page_not_found(e):
@@ -116,16 +106,20 @@ def search():
     req={}
     error=""
     table=""
+    search=searchdata()
+    types=search.listdata('sampletypelist')
+    selected=None
     if request.method == 'POST':
+        print(request.form)
         if searchbuttontext ==  request.form['button']:    
-            True
+            selected=request.form['sampletype']
         else:
             print("Unknown button")
         print(request.form)
     else:
         True
     fields=None
-    return render_template('search.html',path=request.path,sebt=searchbuttontext,dataset=set,error=error,table=table,fields=fields,req=request.form,title="Datasøk")
+    return render_template('search.html',path=request.path,sebt=searchbuttontext,dataset=set,error=error,table=table,fields=fields,req=request.form,title="Datasøk",types=types,selected=selected)
 #    return render_template('search.html',sebt=searchbuttontext)
 
 @app.route("/upload", methods=['GET', 'POST'])
