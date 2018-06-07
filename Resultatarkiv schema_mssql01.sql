@@ -23,3 +23,12 @@ create table datafile(
   
   
   alter table projects alter column restrictions varchar(2048)
+  
+create view fullsample as
+select sample.id,Projects.name,reftime,SampletypeList.name as sampletype,GeoAreas.name as Area,comment,species_no as art
+,samplestart,samplestop,parentsampleid,sample_date,location.STY as latitude, location.STX as longitude
+from sample left outer join projects on projectid=projects.id left join sampletypelist on sampletype=sampletypelist.id 
+left outer join Geoareas on sample.areaid=GeoAreas.areaid 
+left outer join SpeciesList on speciesid=SpeciesList.id
+
+
