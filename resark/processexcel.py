@@ -548,7 +548,7 @@ class excelfile(dbconnector):
                 if not field.value in self.samplefields:
                     self.addvalueerror("Ukjent sample felt",col,self.headerRows,field.value)
             elif type.value == 'AREAID':
-                self.cursor.execute("select count(id) from GeoAreas where objtype = ?",field.value)
+                self.cursor.execute("select count(areaid) from GeoAreas where objtype = ?",field.value)
                 number=self.cursor.fetchall()[0][0]
                 if number == 0:
                     self.addvalueerror("Ukjent arealtype",col,self.headerRows,field.value)
