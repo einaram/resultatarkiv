@@ -9,22 +9,41 @@
   {{ super() }}
   {% endblock %}
 {% block content %}
-{{selected}}
-   <form action="{{path}}" method="post" enctype="multipart/form-data">
-       <p class="formpara"><label for="sampletype">Prøvetype : </label><select name="sampletype" id="sampletype" >
+   <form action="{{path}}" method="get" enctype="multipart/form-data">
+       <div class="disptable">
+       <p class="formpara"><label for="sampletype">Prøvetype : </label><select class="selectitem" name="sampletype" id="sampletype" >
        <option value="0" ></option>
     {% for type in types %}
-        {% if type[0] == selected %}
-        {% set sel='SELECTED="SELECTED"' %}
-        {% else %}
         {% set sel=''%}
+        {% if type[0]|string == selected %}
+        {% set sel='SELECTED="SELECTED"' %}
         {% endif %}
         <option value="{{type[0]}}" {{sel}}>{{type[1]}}</option>
     {% endfor %}
 </select>
        
        <p><input type="submit" id="searchdata" name="button" value="{{ sebt }}"></p>
-    </form>
+       </div>
+{% if nfound != None %}
+ <p>Følgende prøver passer med søket:</p>
+ <table border="1" cellpadding="5" cellspacing="0" style="border-collapse:collapse;">
+ <tr>{%for field in ovf %}
+<th>{{field}}</th>
+{%endfor%} </tr>
+ {% for row in nfound %}<tr>
+ {%for fld in row %}
+ {%if loop.index==1 %}
+ <td> <input type="checkbox" id="projectid_{{fld}}" name="projectid_{{fld}}"/> </td>
+ {%else%}
+ <td>{{fld}}</td>
+ {%endif %}
+ {% endfor %}</tr>
+ {% endfor %}</table>
+ <p>Ved å laste ned data, bekrefter jeg at de skal brukes i samsvar med restriksjonene som er oppgitt.</p>
+       <p><input type="submit" id="downloaddata" name="button" value="{{ dlbt }}"></p>
+{%endif%}
+  
+ </form>
  {% if error != None %}
  <h2>{{ error }}</h2>
  {% endif %}

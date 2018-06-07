@@ -1,4 +1,11 @@
 import pyodbc 
+import collections
+
+def tree():
+    return collections.defaultdict(tree)
+    # Makes handling of multidimentional dicts easier
+
+
 
 class dbconnector:
     
@@ -34,7 +41,14 @@ class dbconnector:
             row = self.cursor.fetchone()     
         return(list)
     
-        
+    def listnames(self,table):
+        sql = "select id,name from "+table+" order by name"
+        self.cursor.execute(sql)
+        table=self.cursor.fetchall()
+        return(table)
+    
+    
+    
         
     def fetchdict(self,sql,params=None):
         if params==None:
@@ -64,7 +78,14 @@ class dbconnector:
             table=self.tablename
         sql="select column_name,is_nullable,data_type,character_maximum_length from information_schema.columns where table_name=?"
         self.columns=self.fetchdict(sql,(table))
-        
+    
+    def getcolnames(self,table=None):
+        self.getcolumns(table)
+        cols=[]
+        for col in self.columns:
+            cols.append(col['column_name'])
+        self.colnames=cols
+    
     def hash(self):
         if self.columns==None:
             self.getcolumns()

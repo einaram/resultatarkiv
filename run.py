@@ -1,6 +1,6 @@
 import os
 from xlrd import open_workbook
-from flask import Flask, render_template, request, redirect, url_for, flash, session, abort, Response
+from flask import Flask, render_template, request, redirect, url_for, flash, session, abort, Response,send_from_directory
 from flask_login import LoginManager, UserMixin, login_required, login_user, logout_user 
 
 from werkzeug import secure_filename
@@ -90,7 +90,7 @@ def logout():
 @app.errorhandler(401)
 def page_not_found(e):
     return Response('<p>Ugyldig bruker</p><p><a href="/">Tilbake</a>')
-    
+   
     
 # callback to reload the user object        
 @login_manager.user_loader
@@ -99,27 +99,33 @@ def load_user(userid):
             
 @app.route("/search", methods=['GET', 'POST'])
 def search():
-    print(request.path)
     searchbuttontext="Søk"
     savebuttontext="Lagre"
+    downloadbuttontext="Last ned"
     set=None
     req={}
     error=""
     table=""
     search=searchdata()
-    types=search.listdata('sampletypelist')
+    types=search.listnames('sampletypelist')
+    
+    overviewfields=search.overviewfields()
+    overviewfields.insert(0,"Bruk")
     selected=None
-    if request.method == 'POST':
-        print(request.form)
-        if searchbuttontext ==  request.form['button']:    
-            selected=request.form['sampletype']
+    nfound=None
+    if request.method == 'GET':
+        if searchbuttontext ==  request.args.get('button'):    
+            selected=request.args['sampletype']
+            nfound=search.countsamples(request.args)
+        elif downloadbuttontext ==  request.args.get('button'):
+            search.download(request.args,UPLOAD_FOLDER)
+            return send_from_directory(directory=app.config['UPLOAD_FOLDER'], filename=search.filename,as_attachment=True)
         else:
             print("Unknown button")
-        print(request.form)
-    else:
-        True
+        pass
+    
     fields=None
-    return render_template('search.html',path=request.path,sebt=searchbuttontext,dataset=set,error=error,table=table,fields=fields,req=request.form,title="Datasøk",types=types,selected=selected)
+    return render_template('search.html',ovf=overviewfields,path=request.path,dlbt=downloadbuttontext,sebt=searchbuttontext,dataset=set,error=error,table=table,fields=fields,req=request.form,title="Datasøk",types=types,selected=selected,nfound=nfound)
 #    return render_template('search.html',sebt=searchbuttontext)
 
 @app.route("/upload", methods=['GET', 'POST'])
@@ -149,7 +155,7 @@ def process():
     return render_template('process.html', my_string=request.files['file'].filename, filepath=filepath,
         title="Processing file", current_time=datetime.datetime.now(),
         valuewarnings=importfile.valuewarning,valueerrors=importfile.valueerror,md5=importfile.md5)
-        
+      
 @app.route("/importdata", methods=['POST'] )
 @login_required
 def importdata():

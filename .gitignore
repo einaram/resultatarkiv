@@ -107,3 +107,4 @@ ENV/
 #misc local
 testdata/
 test*.py
+export*

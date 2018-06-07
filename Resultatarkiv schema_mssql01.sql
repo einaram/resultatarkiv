@@ -19,3 +19,7 @@ create table datafile(
   email varchar(255),
   password varchar(255),
   userclass integer not null default 0);
+  
+  
+  
+  alter table projects alter column restrictions varchar(2048)
