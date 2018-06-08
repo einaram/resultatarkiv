@@ -75,11 +75,12 @@ class searchdata(dbconnector):
     
     def download(self,req,folder):
         print(req)
-        table='fullsample'
-        self.preparequeryfields2(table,req)
-        cols=self.colnames
+        self.preparequeryfields2('sample',req)
         subselect="(select id from sample where "+' and '.join(self.fields)+")"
         sql="select distinct m.id,name from metadatalist m right join samplemetadata on m.id = metadataid where sampleid in "+subselect
+        cols=self.colnames
+        values=self.values
+    #    self.preparequeryfields2('fullsample',req)
         metadata=self.subtype(sql,subselect,'metadataid','m')
         
         sql="select distinct q.id,name from quantitylist q right join samplevalue on q.id=quantityid where sampleid in "+subselect 
@@ -88,13 +89,11 @@ class searchdata(dbconnector):
         headertemplate="{0};{0}_unc"
         selecttemplate="{0}.value '{1}_act',{0}.unc_value '{1}_unc'"
         nuclidedata=self.subtype(sql,subselect,'nuclideid','n',selecttemplate,headertemplate)
-        print(nuclidedata)
         # select f.*,m1.value "Alder" from fullsample f left join samplemetadata m1 on m1.sampleid=f.id and m1.metadataid=1139 where f.id in (select id from sample where sampletype=1105 and projectid in (7,16))
         sqlselect="select f.*  ,"+",".join(nuclidedata[0])+","+" , ".join(metadata[0])
         sqlfrom="from fullsample f left join samplevalue "+" left join samplevalue ".join(nuclidedata[1]) +" left join samplemetadata "+" left join samplemetadata ".join(metadata[1]) 
         sqlwhere=" where f.id in "+subselect
         sql=sqlselect+sqlfrom+sqlwhere
-        print(sql)
         #sql="select "+",".join(cols)+" from sample where "
         # self.getcolnames(table)
         timestamp=datetime.datetime.now().strftime("%y%m%d_%H%M%S")
@@ -103,7 +102,7 @@ class searchdata(dbconnector):
         sep=";"
         wf.write(sep.join(cols)+sep+sep.join(nuclidedata[2])+sep+sep.join(metadata[2])+"\n")
         #wf.write(sep.join(cols)+"\n")
-        self.cursor.execute(sql,self.values)
+        self.cursor.execute(sql,values)
         while True: 
             row=self.cursor.fetchone()
             if row is None: 
