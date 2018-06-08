@@ -51,35 +51,64 @@ class searchdata(dbconnector):
             self.fields.append(k)
             
                 
-                
+    def subtype(self,sql,subselect,idfield,prefix='x',selecttemplate=None,headertemplate=None):
+        if selecttemplate==None:
+            selecttemplate = "{0}.value '{1}'"
+        if headertemplate==None:
+            headertemplate="{0}"
+        self.cursor.execute(sql,self.values)
+        fetch=self.cursor.fetchall()
+        metadata=[]
+        select=[]
+        where=[]
+        header=[]
+        for i in fetch:
+            metadata.append([i[0],i[1]])
+            id=str(i[0])
+            alias=prefix+id
+            select.append(selecttemplate.format(alias,id))
+            where.append(alias+" on "+alias+".sampleid=f.id and "+alias+"."+idfield+"="+id)
+            header.append(headertemplate.format(i[1]))
+        metadata=[select,where,header]
+        return(metadata)
     
     
     def download(self,req,folder):
         print(req)
-        table='sample'
+        table='fullsample'
         self.preparequeryfields2(table,req)
         cols=self.colnames
         subselect="(select id from sample where "+' and '.join(self.fields)+")"
-        sql="select distinct name from metadatalist right join samplemetadata on metadatalist.id = metadataid where sampleid in"+subselect
-        self.cursor.execute(sql,self.values)
-        fetch=self.cursor.fetchall()
-        metadata=[]
-        for i in fetch:
-            metadata.append(i[0])
-        print(metadata)
-        sql="select * from fullsample where id in "+subselect
+        sql="select distinct m.id,name from metadatalist m right join samplemetadata on m.id = metadataid where sampleid in "+subselect
+        metadata=self.subtype(sql,subselect,'metadataid','m')
+        
+        sql="select distinct q.id,name from quantitylist q right join samplevalue on q.id=quantityid where sampleid in "+subselect 
+        quantitydata=self.subtype(sql,subselect,'quantityid','q')
+        sql="select distinct n.id,name from nuclidelist n right join samplevalue on n.id=nuclideid where  nuclideid is not null and sampleid in "+subselect
+        headertemplate="{0};{0}_unc"
+        selecttemplate="{0}.value '{1}_act',{0}.unc_value '{1}_unc'"
+        nuclidedata=self.subtype(sql,subselect,'nuclideid','n',selecttemplate,headertemplate)
+        print(nuclidedata)
+        # select f.*,m1.value "Alder" from fullsample f left join samplemetadata m1 on m1.sampleid=f.id and m1.metadataid=1139 where f.id in (select id from sample where sampletype=1105 and projectid in (7,16))
+        sqlselect="select f.*  ,"+",".join(nuclidedata[0])+","+" , ".join(metadata[0])
+        sqlfrom="from fullsample f left join samplevalue "+" left join samplevalue ".join(nuclidedata[1]) +" left join samplemetadata "+" left join samplemetadata ".join(metadata[1]) 
+        sqlwhere=" where f.id in "+subselect
+        sql=sqlselect+sqlfrom+sqlwhere
+        print(sql)
         #sql="select "+",".join(cols)+" from sample where "
         # self.getcolnames(table)
         timestamp=datetime.datetime.now().strftime("%y%m%d_%H%M%S")
         self.filename="resultatarkiv_"+timestamp+".csv"
         wf=open(folder+"/"+self.filename,"w")
         sep=";"
-        wf.write(sep.join(cols)+sep+sep.join(metadata)+"\n")
+        wf.write(sep.join(cols)+sep+sep.join(nuclidedata[2])+sep+sep.join(metadata[2])+"\n")
+        #wf.write(sep.join(cols)+"\n")
         self.cursor.execute(sql,self.values)
         while True: 
             row=self.cursor.fetchone()
             if row is None: 
                 break
+            id=row[0]
             row = list(map(str,row))
             wf.write(sep.join(row)+"\n")
         
