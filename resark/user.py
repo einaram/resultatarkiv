@@ -31,6 +31,21 @@ class User(UserMixin,dbconnector):
     def is_authenticated(self):
         return(self.authenticated)
     
+    def store_password(self):
+        sql="update users set hashedpassword=? where username=?"
+        self.cursor.execute(sql,self.pw_hash,self.id)
+        self.cursor.commit()
+    
+    def update_password(self,oldpass,newpass):
+        if self.check_password(oldpass):
+            print("ok")
+            self.set_password(newpass)
+            self.store_password()
+            print(self.pw_hash)
+        else:
+            print("feil passord")
+        print(newpass)
+    
     def __repr__(self):
         return "%s/%s/%s/%s" % (self.id, self.name,self.email,self.pw_hash)
 
@@ -41,7 +56,7 @@ class User(UserMixin,dbconnector):
         ok=False
         if self.pw_hash==None:
             return False
-        if self.pw_hash.startswith('sha'):
+        if self.pw_hash.startswith('pbkdf2:sha256:50000$'):
             return check_password_hash(self.pw_hash, password)
         else: # need a fallback until implementation is finished. 
             return self.pw_hash==password

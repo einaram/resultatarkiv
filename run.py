@@ -1,7 +1,7 @@
 import os
 from xlrd import open_workbook
 from flask import Flask, render_template, request, redirect, url_for, flash, session, abort, Response,send_from_directory
-from flask_login import LoginManager, UserMixin, login_required, login_user, logout_user 
+from flask_login import LoginManager, UserMixin, login_required, login_user, logout_user ,current_user
 
 from werkzeug import secure_filename
 import hashlib
@@ -32,8 +32,10 @@ app.jinja_env.lstrip_blocks = True
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = "login"
+
 @login_manager.user_loader
 def load_user(user_id):
+  #  g.user = current_user.username
     return User.get(user_id)
 
 def allowed_file(filename):
@@ -55,10 +57,21 @@ app.jinja_env.filters['datetimefilter'] = datetimefilter
 def home():
     return render_template('template.html',title="Resultatarkiv")
 
-@app.route("/user")
+@app.route("/user", methods=["GET", "POST"])
 @login_required
 def user():
-    return render_template('user.html',title="Brukerinnstillinger")
+    text=""
+    if request.method == 'POST':
+        oldpass=request.form['oldpass']
+        password=request.form['pass1']
+        if password == request.form['pass2']:
+            current_user.update_password(oldpass,password)
+            text="Nytt passord - OK" 
+            
+            
+        else:
+            text="Nytt passord stemmer ikke med gjentakelse"
+    return render_template('user.html',title="Brukerinnstillinger",text=text)
     
     
 # somewhere to login
