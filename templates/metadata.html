@@ -14,7 +14,9 @@
        {%for field in fields %}
        {% set ro="" %}
        {% if field == "id"%}
-       {%set ro='readonly="readonly"' %}
+       {%set ro='readonly="readonly"'|safe %}
+       {% else %}
+       {%set ro='class="needed"'|safe %}
        {%endif %}
             <p class="formpara"><label for="{{field}}input">{{field|title}} : </label><input name="{{field}}" id="{{field}}input" {{ro}} value="{{req[field]}}"/></p>
        {%endfor%}
