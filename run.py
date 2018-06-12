@@ -64,10 +64,14 @@ def user():
     if request.method == 'POST':
         oldpass=request.form['oldpass']
         password=request.form['pass1']
-        if password == request.form['pass2']:
-            current_user.update_password(oldpass,password)
-            text="Nytt passord - OK" 
-            
+        minpass=5
+        if len(password) < minpass:
+            text="For kort passord - det må være minst {} tegn".format(minpass)
+        elif password == request.form['pass2']:
+            if current_user.update_password(oldpass,password):
+                text="Nytt passord - OK" 
+            else:
+                text="Kunne ikke oppdatere passord - er gammelt passord riktig?"
             
         else:
             text="Nytt passord stemmer ikke med gjentakelse"

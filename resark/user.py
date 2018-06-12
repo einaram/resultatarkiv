@@ -37,15 +37,14 @@ class User(UserMixin,dbconnector):
         self.cursor.commit()
     
     def update_password(self,oldpass,newpass):
+        retval=False
         if self.check_password(oldpass):
-            print("ok")
             self.set_password(newpass)
             self.store_password()
             print(self.pw_hash)
-        else:
-            print("feil passord")
-        print(newpass)
-    
+            retval=True
+        return(retval)
+            
     def __repr__(self):
         return "%s/%s/%s/%s" % (self.id, self.name,self.email,self.pw_hash)
 
