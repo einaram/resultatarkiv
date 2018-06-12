@@ -48,8 +48,7 @@ def datetimefilter(value, format='%Y/%m/%d %H:%M'):
     return value.strftime(format)
 
 app.jinja_env.filters['datetimefilter'] = datetimefilter
-
-
+ 
     
 @app.route("/None")
 @app.route("/")
@@ -59,7 +58,7 @@ def home():
 @app.route("/user")
 @login_required
 def user():
-    return render_template('template.html',title="Brukerinnstillinger")
+    return render_template('user.html',title="Brukerinnstillinger")
     
     
 # somewhere to login
