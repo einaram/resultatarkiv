@@ -41,18 +41,24 @@
             <li class="dropdown">
               <a href="#" class="dropdown-toggle" data-toggle="dropdown">Rediger data <b class="caret"></b></a>
               <ul class="dropdown-menu">
-                {{ nav_link('metadata','Metadatatyper')}}
-                {{ nav_link('quantity','Numeriske enheter')}}
-                {{ nav_link('project','Prosjekter')}}
-                {{ nav_link('topic','Prosjektområder')}}
-                {{ nav_link('nuclide','Nuklider')}}
-                {{ nav_link('species','Arter')}}
-                {{ nav_link('sampletype','Prøvetyper')}}
-                {{ nav_link('samplecat','Prøvekategorier')}}                
-                {{ nav_link('habitat','Habitater')}}              
+                 <li><a href="/metadata">Metadatatyper</a></li>
+                  <li><a href="/quantity">Numeriske enheter</a></li>
+                  <li><a href="/project">Prosjekter</a></li>
+                  <li><a href="/topic">Prosjektområder</a></li>
+                  <li><a href="/nuclide">Nuklider</a></li>
+                  <li><a href="/species">Arter</a></li>
+                  <li><a href="/sampletype">Prøvetyper</a></li>
+                  <li><a href="/samplecat">Prøvekategorier</a></li>
+                  <li><a href="/habitat">Habitater</a></li>
               </ul>
-            {{ nav_link('logout','Logg ut')}}
-            {{ nav_link('user',current_user.name)}}
+             </li>
+            <li class="dropdown">
+              <a href="#" class="dropdown-toggle" data-toggle="dropdown">{{current_user.name}} <b class="caret"></b></a>
+              <ul class="dropdown-menu">
+                <li><a href="/user">Sett passord</a></li>
+                {{ nav_link('logout','Logg ut')}}
+              </ul>
+             </li>
             {%else%}
             {{nav_link('login','Logg inn')}}
             {%endif%}
