@@ -1,5 +1,6 @@
 import pyodbc 
 import collections
+import os 
 
 def tree():
     return collections.defaultdict(tree)
@@ -64,14 +65,40 @@ class dbconnector:
     def connecttodb(self):
         self.server="Server=NRPA-3220\\SQLEXPRESS;"
         self.database="DataArkiv"
+        #self.database="DataArkiv_tom"
+        
         #self.server="Server=databasix2\\databasix2;"
         connectstring="Driver={SQL Server Native Client 11.0};"+self.server+"Database="+self.database+";"+"Trusted_Connection=yes;Autocommit=False"
         self.cnxn = pyodbc.connect(
                       connectstring
                       )
         self.cursor = self.cnxn.cursor()
-        print("connecting ",self.server)
-    
+        print("connected ",self.server)
+        scriptdir="sqlupdate"
+        for script in os.listdir(scriptdir):
+            sql="select count(id) from datafile where filename=?"
+            self.cursor.execute(sql,script)
+            if self.cursor.fetchall()[0][0]==0:
+                with open(scriptdir+'\\' + script,'r') as inserts:
+                    sqlScript = inserts.readlines()
+                    sqlScript=" ".join(sqlScript)
+                   
+                    for statement in sqlScript.split(';'):
+                        print(statement)
+                        try:
+                            self.cursor.execute(statement)
+                            self.cursor.commit()
+                            print("OK")
+                        except pyodbc.ProgrammingError as e:
+                            print(e)
+                        except pyodbc.IntegrityError as e:
+                            print(e)
+                sql="insert into datafile (filename,imported,md5) values(?,1,'none')"
+            self.cursor.execute(sql,script)
+            self.cursor.commit()
+                    
+        print("updates OK")
+        
     
     def getcolumns(self,table=None):
         if table==None:
@@ -87,7 +114,7 @@ class dbconnector:
         self.colnames=cols
     
     def hash(self):
-        if self.columns==None:
+        if not hasattr(self,"columns") or self.columns==None:
             self.getcolumns()
         d={}
         for k in self.columns:
