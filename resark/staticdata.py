@@ -7,7 +7,7 @@ class metadatalist(dbconnector):
 #TODO: Presenter og editer data med foreign key-kobling
 
     
-    def __init__(self,tablename,name=None,shortname=None,description=None,id=None,req=None):
+    def __init__(self,tablename,name=None,shortname=None,username=None,description=None,id=None,req=None):
         self.tablename=tablename
         if req !=None:
             for k,v in req.items():
@@ -19,6 +19,7 @@ class metadatalist(dbconnector):
             self.name=name
             self.shortname=shortname
             self.description=description
+            self.username=username
             self.id=id
         try:
             if self.shortname != None:
@@ -30,6 +31,13 @@ class metadatalist(dbconnector):
         self.cursor=None
     
     
+    def checkexists(self,req):
+        uniquefields=["name","shortname"]
+        #for f in uniquefields:
+        #    if getattr(self,f)!=None       
+        sql = "count id from "+self.table +" where name=? or shortname =?"
+        self.cursor.execute(sql,self.name,self.shortname)
+        return(self.cursor.fetchall()[0][0])
         
     
     def search(self,n=None,partial=True):
@@ -41,6 +49,7 @@ class metadatalist(dbconnector):
         for k,v in self.hash().items():
             print(k,v)
             if v != None:
+                v=str(v)
                 if partial:
                     fields.append(k+" like ?")
                     values.append("%%"+v+"%%")
@@ -59,7 +68,10 @@ class metadatalist(dbconnector):
     
     def dynfields(self):
         fields=list(self.hash().keys())
-        fields.remove('id')
+        try:
+            fields.remove('id')
+        except:
+            pass # Id did not exist - I do not care
         return(fields)
         
     def fields(self):

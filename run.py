@@ -11,6 +11,10 @@ from resark.staticdata import metadatalist
 from resark.searchdata import searchdata
 from resark.user import User
 from resark.dbconnector import dbconnector
+from inspect import currentframe, getframeinfo
+
+frameinfo = getframeinfo(currentframe())
+
 
 if platform.system()=='Windows':
 	UPLOAD_FOLDER = 'c:/windows/temp/'
@@ -42,7 +46,7 @@ def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1] in ALLOWED_EXTENSIONS
   
-           
+         
            
 @app.template_filter()
 def datetimefilter(value, format='%Y/%m/%d %H:%M'):
@@ -59,7 +63,7 @@ def home():
 
 @app.route("/user", methods=["GET", "POST"])
 @login_required
-def user():
+def setnewpassword():
     text=""
     if request.method == 'POST':
         oldpass=request.form['oldpass']
@@ -72,7 +76,6 @@ def user():
                 text="Nytt passord - OK" 
             else:
                 text="Kunne ikke oppdatere passord - er gammelt passord riktig?"
-            
         else:
             text="Nytt passord stemmer ikke med gjentakelse"
     return render_template('user.html',title="Brukerinnstillinger",text=text)
@@ -217,13 +220,20 @@ def nuclide():
     return staticdata("nuclidelist")
 
 @app.route("/sampletype", methods=['POST','GET'])
+@login_required
 def sampletype():
     return staticdata("sampletypelist")
     
 @app.route("/species", methods=['POST','GET'])
+@login_required
 def species():
     return staticdata("specieslist")
     
+@app.route("/newuser", methods=['POST','GET'])
+@login_required
+def newuser():
+    return staticdata("users")
+
 def staticdata(table):  
     print(request.path)
     print(table)
@@ -232,18 +242,17 @@ def staticdata(table):
     set=None
     error=""
     if request.method == 'POST':
-        mtdt=metadatalist(table,req=request.form)
+        if table=="users":
+            mtdt=User(request.form["username"])
+        else:
+            mtdt=metadatalist(table,req=request.form)
+            # mtdt.getcolumns()    
         if searchbuttontext ==  request.form['button']:    
             set=mtdt.search()
         elif savebuttontext == request.form['button']:
-            md=metadatalist(table,name=request.form["name"])
-            n=len(md.search(partial=False))
-            try:
-                md=metadatalist(table,shortname=request.form["shortname"])
-                n=n+len(md.search(partial=False))
-            except AttributeError:
-                True # Just ignore it
-            print(n)
+            n=mtdt.checkexists()
+            if table=="users":
+                mtdt.reqset(request.form)
             if n>0:
                 error="eksisterende"
             else:
@@ -254,7 +263,9 @@ def staticdata(table):
             print("Unknown button")
     else:
         mtdt=metadatalist(table)
+    print( frameinfo.filename, frameinfo.lineno)
     fields=mtdt.fields()
+    print( frameinfo.filename, frameinfo.lineno)
     return render_template('metadata.html',path=request.path,sebt=searchbuttontext,sabt=savebuttontext,dataset=set,error=error,table=table,fields=fields,req=request.form,title=table.title())
 
    
