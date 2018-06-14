@@ -1,0 +1,66 @@
+{% extends "layout.html" %}
+{% block title %}{{title}}{% endblock %}
+{% block head %}
+  {{ super() }}
+  <script type="text/javascript" src="{{ url_for('static', filename='search.js') }}"></script>
+{% endblock %}
+{% block page %}{{title}}{% endblock %}
+{% block heading %}
+  {{ super() }}
+  {% endblock %}
+{% block content %}
+   <form action="{{path}}" method="get" enctype="multipart/form-data">
+       <div class="disptable">
+       <p class="formpara"><label for="sampletype">Prøvetype : </label><select class="selectitem" name="sampletype" id="sampletype" >
+       <option value="0" ></option>
+    {% for type in types %}
+        {% set sel=''%}
+        {% if type[0]|string == selected %}
+        {% set sel='SELECTED="SELECTED"' %}
+        {% endif %}
+        <option value="{{type[0]}}" {{sel}}>{{type[1]}}</option>
+    {% endfor %}
+</select>
+       
+       <p><input type="submit" id="searchdata" name="button" value="{{ sebt }}"></p>
+       </div>
+{% if nfound != None %}
+ <p>Følgende prøver passer med søket:</p>
+ <table border="1" cellpadding="5" cellspacing="0" style="border-collapse:collapse;">
+ <tr>{%for field in ovf %}
+<th>{{field}}</th>
+{%endfor%} </tr>
+ {% for row in nfound %}<tr>
+ {%for fld in row %}
+ {%if loop.index==1 %}
+ <td> <input type="checkbox" id="projectid_{{fld}}" name="projectid_{{fld}}" class="projectcheck"/> </td>
+ {%else%}
+ <td>{{fld}}</td>
+ {%endif %}
+ {% endfor %}</tr>
+ {% endfor %}</table>
+ <p>Ved å laste ned data, bekrefter jeg at de skal brukes i samsvar med restriksjonene som er oppgitt.</p> 
+ <p>I de tilfellene det er flere målinger på en nuklide for en prøve, vil disse komme ut på separate rader med dupliserte rader for prøven. Det er brukerens ansvar å håndtere disse dataene som ønsket</p>
+ <p>Alle resultater vil bli oppgitt i opprinnelige enheter.</p>
+       <p><input type="submit" id="downloaddata" name="button" value="{{ dlbt }}"></p>
+{%endif%}
+  
+ </form>
+ {% if error != None %}
+ <h2>{{ error }}</h2>
+ {% endif %}
+ {% if dataset != None %}
+ <table border="1" cellpadding="5" cellspacing="0" style="border-collapse:collapse;">
+ <tr>{%for field in fields %}
+<th>{{field}}</th>
+{%endfor%} </tr>
+ {% for row in dataset %}<tr>
+ {%for fld in row %}
+ <td>{{fld}}</td>
+ {% endfor %}</tr>
+ {% endfor %}</table>
+ {% endif %}
+  {% block footer %}
+  {{super()}}
+  {% endblock %}
+{% endblock %}

@@ -1,0 +1,23 @@
+{% extends "layout.html" %}
+{% block title %}{{title}}{% endblock %}
+{% block head %}
+  {{ super() }}
+  <script type="text/javascript" src="{{ url_for('static', filename='process.js') }}"></script>
+
+{% endblock %}
+{% block page %}{{title}}{% endblock %}
+{% block heading %}
+  {{ super() }}
+{% endblock %}
+{% block content %}
+  
+   <form action="/importdata" method="post" enctype="multipart/form-data">
+      <input type="hidden" name="filepath" value={{ filepath }}>
+         <input type="submit" id="importdata" value="Import data">
+    </form>
+ 
+  
+  {% block footer %}
+  {{super()}}
+  {% endblock %}
+{% endblock %}

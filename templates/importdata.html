@@ -8,10 +8,10 @@
   {{ super() }}
 {% endblock %}
 {% block content %}
-  <form action="/process" method="post" enctype="multipart/form-data">
-      <p><input type="file" name="file">
-         <input type="submit" value="Upload">
-    </form>
+  <p>Importerer datafil...</a>
+  {{ filepath }}
+  {{ md5 }}
+  <p><a href="/upload">Last opp mer</a></p>
   {% block footer %}
   {{super()}}
   {% endblock %}

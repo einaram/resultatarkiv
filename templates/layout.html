@@ -7,10 +7,15 @@
     {% endblock %}
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="http://netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap.min.css" rel="stylesheet" media="screen">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
     <style type="text/css">
       .container {
         max-width: 700px;
       }
+      .disptable  { display: table;      }
+	  .formpara     { display: table-row;  }
+      label { display: table-cell; }
+	  input { display: table-cell; }
       h2 {color: red;}
     </style>
   </head>
@@ -29,28 +34,52 @@
 
         <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
           <ul class="nav navbar-nav">
-            {{ nav_link('upload', 'Upload') }}
-            {{ nav_link('about', 'About') }}
+            {{ nav_link('search', 'Søk') }}
+            {%if current_user.is_authenticated %}
+            {{ nav_link('upload', 'Last opp') }}
+            <ul class="nav navbar-nav navbar-right">
+            <li class="dropdown">
+              <a href="#" class="dropdown-toggle" data-toggle="dropdown">Rediger data <b class="caret"></b></a>
+              <ul class="dropdown-menu">
+                 <li><a href="/metadata">Metadatatyper</a></li>
+                  <li><a href="/quantity">Numeriske enheter</a></li>
+                  <li><a href="/project">Prosjekter</a></li>
+                  <li><a href="/topic">Prosjektområder</a></li>
+                  <li><a href="/nuclide">Nuklider</a></li>
+                  <li><a href="/species">Arter</a></li>
+                  <li><a href="/sampletype">Prøvetyper</a></li>
+                  <li><a href="/samplecat">Prøvekategorier</a></li>
+                  <li><a href="/habitat">Habitater</a></li>
+                  <li><a href="/newuser">Ny bruker</a></li>
+                
+              </ul>
+             </li>
+            <li class="dropdown">
+              <a href="#" class="dropdown-toggle" data-toggle="dropdown">{{current_user.name}} <b class="caret"></b></a>
+              <ul class="dropdown-menu">
+                <li><a href="/user">Sett passord</a></li>
+                {{ nav_link('logout','Logg ut')}}
+              </ul>
+             </li>
+            {%else%}
+            {{nav_link('login','Logg inn')}}
+            {%endif%}
+            {{ nav_link('about', 'Om') }}
           </ul>
-          <form class="navbar-form navbar-left" role="search">
+        <!--  <form class="navbar-form navbar-left" role="search">
             <div class="form-group">
               <input type="text" class="form-control" placeholder="Search">
             </div>
             <button type="submit" class="btn btn-default">Submit</button>
-          </form>
+          </form> 
+          
           <ul class="nav navbar-nav navbar-right">
             <li><a href="#">Link</a></li>
             <li class="dropdown">
               <a href="#" class="dropdown-toggle" data-toggle="dropdown">Dropdown <b class="caret"></b></a>
-              <ul class="dropdown-menu">
-                <li><a href="#">Action</a></li>
-                <li><a href="#">Another action</a></li>
-                <li><a href="#">Something else here</a></li>
-                <li class="divider"></li>
-                <li><a href="#">Separated link</a></li>
-              </ul>
-            </li>
-          </ul>
+              {{ nav_link('sampletype','Prøvetyper')}}
+            </li> -->
+          
         </div><!-- /.navbar-collapse -->
       </div><!-- /.container-fluid -->
     </nav>
