@@ -67,21 +67,7 @@ def tree():
 class excelfile(dbconnector):
     def __init__(self,file):
         self.file=file
-        self.InvalidHeaderUnit = "Header '%s', column %i, has wrong unit. Is '%s' but this is not registered as a valid unit."
-        self.InvalidHeaderUnitNuclide = "Nuclide header '%s', column %i, has wrong unit. Is '%s' but this is not registered as a valid unit."
-        self.InvalidHeaderBase = "Header '%s', column %i, has wrong unit. Is '%s' but should be '%s'."
-        self.InvalidHeader = "Header '%s' is not recognised as a valid header."
-        self.InvalidNuclide = "Nuclide '%s', column %i,  is not recognised as valid. Is it registered in the database?"
-        self.HeaderNonValidNuclide = "Header '%s' does not proceed a valid inital column of this nuclide, a column without any _* postfix. Last registered nuclide is '%s'."
-        self.InvalidProjectid = "Project %s is not defined"
-        self.invalidValue = "%s has an invalid value"
-        self.OkHeader = "Header '%s' with unit %s is OK"
-        self.InvalidArea = "Header '%s', column %i, has a wrong unit %s. Unit should be one of %s"
-        self.ShortSummaryWrong = "Summary: %i headers were read, %i were ok and %i had errors. Please revise based on given messages."
-        self.ShortSummaryRight = "Summary: %i headers were read and %i are ok. Congratulation."
-        self.CheckDataMessage = "Checked data in column '%s' of type %s, and found %i row(s) with error. Rows with error are available from object '%s'"
-        self.NotCheckDataMessage = "Did not check column '%s' of type %s, because it is a string."   
-        self.ShortSummaryValidation = "Checked data in %i columns. %i are OK, and %i are not ok and should be checked based on error messages above."
+        self.invalidValue = "%s er en ugyldig verdi"
         self.ExpectedBlank = "Forventet blank (%s)"
         self.errorUnknown = "Ukjent verdi i %s"
         self.invalidColOrder = "%s må komme før %s"
@@ -108,17 +94,18 @@ class excelfile(dbconnector):
         
         self.valuewarning=tree()
         self.valueerror=tree()
-        self.SEENBEFORE=1
         self.headerRows=5
         wb = open_workbook(self.file)
         self.sht = wb.sheet_by_index(0)
+        # In some cases there may be an extra blank row before the header
         if self.sht.cell_value(3,0) == "":
             self.headerRows=6
+        # Headerrows is the number of rows in the header - rownumbers are 0 based
         self.fields=self.sht.row(self.headerRows-2) 
         self.types=self.sht.row(self.headerRows-1)
         self.lookup=tree()
-        self.dateFormat=None
-        self.nucs=None
+        self.dateFormat=None # Needs a flexible data format
+        self.nucs=None  # A list of defined nuclides.
         
         self.md5=md5sum(self.file)
         self.connecttodb()
@@ -131,15 +118,18 @@ class excelfile(dbconnector):
 
    
     def cachelookup(self,value,table,sql=None):
+    # Checks ID from a value in cache. Reads from db if not found, stores new values in cache
         if sql==None:
             sql="select id from "+table+" where shortname=?"
         id = None
         if value in self.cache[table]:
             id=self.cache[table][value]
         else:
+            #The id value is not found, must go to db
             self.cursor.execute(sql,value)
             id=self.cursor.fetchall()[0][0]
             # Will give an IndexError if noting is returned
+            # Unless the existance is guaranteed, a try-except should be used
             self.cache[table][value]=id
         return(id)
     
@@ -152,6 +142,8 @@ class excelfile(dbconnector):
         return(ret)
     
     def parsenuc(self,value):
+        # nuc may be on format <NUC>, <NUC>_<Attribute>, NUC may be a nuclide name or <name>#<i> where i is a number
+        # The latter is to be used when there are several results for the same nuclide, e.g. dry and wet weight, different labs, different instruments
         if self.nucs==None:
             self.nucs=self.fetchlist("select shortname from nuclidelist")
         parts=re.split(r'[_#]',value)
@@ -186,7 +178,7 @@ class excelfile(dbconnector):
                     sampledata['VALUE'][field.value]=[cell.value,type.value]
                 elif cell.value != "":
                         sampledata[type.value][field.value]=cell.value
-            if False:
+            if False: # Can be set to true to run if there are parsing problems
                 for item in sampledata:
                     print(item)
                     for key in sampledata[item]:
@@ -203,34 +195,34 @@ class excelfile(dbconnector):
                             sample["CONNECT_TO_PARENT"]=sampleset[sample[field]]
             #TODO: Look into proper parameterization of lat and lon in STGeomFromText
             if "LATITUDE" in sample and sample["LATITUDE"]!= None and sample["LATITUDE"]>0:
+            # It is already checked that LATITUDE and LONGITUDE are floating point numbers
                 location="geometry::STGeomFromText('POINT ("+str(sample["LONGITUDE"])+" "+str(sample["LATITUDE"])+")',4326)"
             else:
-                location="null"
+                location="null" # since it is to be parsed into the sql 
             samplesql="insert into sample(projectid,reftime,sampletype,areaid,comment,speciesid,samplestart,samplestop,parentsampleid,location,sample_date) values(?,?,?,?,?,?,?,?,?,"+location+",?)"
-            # print(samplesql)
-            # print(sample)
-            self.cursor.execute(samplesql,projectid,sample["REF_DATE"],sample["SAMPLETYPE"],sample["AREAID"],sample["COMMENT"],sample["SPECIESID"],sample["SAMPLESTART"],sample["SAMPLESTOP"],sample["CONNECT_TO_PARENT"],sample["SAMPLEDATE"])
+            self.cursor.execute(samplesql,projectid,sample["REF_DATE"],sample["SAMPLETYPE"],sample["AREAID"],sample["COMMENT"],sample["SPECIESID"],sample["SAMPLE_START"],sample["SAMPLE_STOP"],sample["CONNECT_TO_PARENT"],sample["SAMPLE_DATE"])
             self.cursor.execute("SELECT max(id) from sample")
+            # Getting back the id from the last sample.
             sampleid=self.cursor.fetchall()[0][0]
             if "PARENT_ID" in sample:
                 sampleset[sample["PARENT_ID"]]=sampleid
             sql="insert into samplemetadata(sampleid,value,metadataid) values(?,?,?)"
+            
             for item in sampledata["METADATA"]:
                 value=sampledata["METADATA"][item]
                 metadataid=self.cachelookup(item,"metadatalist")
                 self.cursor.execute(sql,sampleid,value,metadataid)
-            #    self.cursor.execute("SELECT max(id) from samplemetadata")
-            #    print(self.cursor.fetchall()[0][0])
+            
             for item in sampledata["VALUE"]:
                 sql="insert into samplevalue(sampleid,value,quantityid,unitid) values(?,?,?,?)"
                 value=sampledata["VALUE"][item]
                 quantityid=self.cachelookup(item,"quantitylist")
                 unitid=self.cachelookup(value[1],"unitlist")
                 self.cursor.execute(sql,sampleid,value[0],quantityid,unitid)
-            #    self.cursor.execute("SELECT max(id) from samplevalue")
-            #    print(self.cursor.fetchall()[0][0])
+            
             for item in sampledata["NUCS"]:
                 sql="insert into samplevalue(sampleid,value,unitid,unc_value,unc_unitid,mda_value,mda_unitid,laboratory,comment,quantityid,nuclideid,instrument,uncmeasure,below_mda) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+                # More difficult to hanlde - a lot of fields may or may not be set.
                 value=None
                 unitid=None
                 unc_value=None
@@ -271,8 +263,6 @@ class excelfile(dbconnector):
                         elif values[1]=="BELOW_MDA":
                             below_mda=values[0]
                     self.cursor.execute(sql,sampleid,value,unitid,unc_value,unc_unitid,mda_value,mda_unitid,laboratory,comment,quantityid,nuclideid,instrument,uncmeasure,below_mda)    
-            #        self.cursor.execute("SELECT max(id) from samplevalue")
-            #        print(self.cursor.fetchall()[0][0])
             print(row)    
         self.cursor.execute("update datafile set imported=1 where filename=? and md5 = ?",self.file,self.md5)
         self.cursor.commit()

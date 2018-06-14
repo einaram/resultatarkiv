@@ -218,7 +218,7 @@ def metadata():
 @login_required
 def nuclide():
     return staticdata("nuclidelist")
-
+    
 @app.route("/sampletype", methods=['POST','GET'])
 @login_required
 def sampletype():
@@ -234,7 +234,7 @@ def species():
 def newuser():
     return staticdata("users")
 
-def staticdata(table):  
+def staticdata(table):
     print(request.path)
     print(table)
     searchbuttontext="Søk"
@@ -250,7 +250,7 @@ def staticdata(table):
         if searchbuttontext ==  request.form['button']:    
             set=mtdt.search()
         elif savebuttontext == request.form['button']:
-            n=mtdt.checkexists()
+            n=mtdt.checkexists(request.form)
             if table=="users":
                 mtdt.reqset(request.form)
             if n>0:

@@ -8,7 +8,7 @@ class searchdata(dbconnector):
     def countsamples(self,req):
         #req=dict(req)
         table='sample'
-        self.preparequeryfields2(table,req)
+        self.preparequeryfields(table,req)
         sql="select projectid,count(sample.id),projects.name,projects.contact,projects.dataowner,projects.restrictions from sample left join projects on projectid=projects.id "
         if len(self.fields)>0:
             sql=sql+"where "+' and '.join(self.fields)
@@ -17,18 +17,9 @@ class searchdata(dbconnector):
         res=self.cursor.fetchall()
         return(res)
     
-    def preparequeryfields_old(self,table,req,multival=None):
-        self.fields=[]
-        self.values=[]
-        self.getcolnames(table)
-        cols=self.colnames
-        for k,v in req.items():
-            if k in cols:
-                self.fields.append(k+"=?")
-                self.values.append(v)
+     
     
-    
-    def preparequeryfields2(self,table,req,multival=None):
+    def preparequeryfields(self,table,req,multival=None):
         self.fielddata=tree()
         self.getcolnames(table)
         for k,v in req.items():
@@ -83,7 +74,7 @@ class searchdata(dbconnector):
     
     def download(self,req,folder):
         print(req)
-        self.preparequeryfields2('sample',req)
+        self.preparequeryfields('sample',req)
         subselect="(select id from sample where "+' and '.join(self.fields)+")"
         sql="select distinct m.id,name from metadatalist m right join samplemetadata on m.id = metadataid where sampleid in "+subselect
         values=self.values
@@ -104,7 +95,7 @@ class searchdata(dbconnector):
         self.filename="resultatarkiv_"+timestamp+".csv"
         wf=open(folder+"/"+self.filename,"w")
         sep=";"
-        self.preparequeryfields2('fullsample',req)
+        self.preparequeryfields('fullsample',req)
         wf.write(sep.join(self.colnames)+sep+sep.join(nuclidedata[2])+sep+sep.join(metadata[2])+"\n")
         self.cursor.execute(sql,values)
         lastrow=[]

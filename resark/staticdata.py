@@ -8,6 +8,7 @@ class metadatalist(dbconnector):
 
     
     def __init__(self,tablename,name=None,shortname=None,username=None,description=None,id=None,req=None):
+        # Initieres helst med req - som kan hentes fra request.form
         self.tablename=tablename
         if req !=None:
             for k,v in req.items():
@@ -25,25 +26,24 @@ class metadatalist(dbconnector):
             if self.shortname != None:
                 self.shortname=self.shortname.upper()
         except AttributeError:
-            # if so, just ignore it.
+            # if so, just ignore it - there is no shortname - maybe better to explicitely ask if the attribute exists
             True
         self.columns=None
-        self.cursor=None
+        self.cursor=self.connecttodb()
     
     
-    def checkexists(self,req):
-        uniquefields=["name","shortname"]
+    def checkexists(self,req,uniquefields=["name","shortname"]):
         #for f in uniquefields:
-        #    if getattr(self,f)!=None       
-        sql = "count id from "+self.table +" where name=? or shortname =?"
+        #    if getattr(self,f)!=None - bygge opp sql...
+        sql = "select count (id) from "+self.tablename +" where name=? or shortname =?"
+        print(sql)
         self.cursor.execute(sql,self.name,self.shortname)
         return(self.cursor.fetchall()[0][0])
         
     
-    def search(self,n=None,partial=True):
+    def search(self,partial=True):
+        # partial - searches for a string anywhere within a field
         # TODO: Return a limited number of values
-        if self.cursor==None:
-            self.connecttodb()
         fields=[]
         values=[]
         for k,v in self.hash().items():
@@ -65,8 +65,11 @@ class metadatalist(dbconnector):
         self.cursor.execute(sql,values)
         set = self.cursor.fetchall()
         return(set)
+   
+        
     
     def dynfields(self):
+        # Lists the user-definable fiels a table
         fields=list(self.hash().keys())
         try:
             fields.remove('id')
@@ -75,13 +78,12 @@ class metadatalist(dbconnector):
         return(fields)
         
     def fields(self):
-        if self.cursor==None:   
-            self.connecttodb()
+        # Returns a list of all fields in the actual table
         return(list(self.hash().keys()))
         
+        
     def save(self):
-        if self.cursor==None:   
-            self.connecttodb()
+        # Saves a record. Run checkexists before to see that the record is unique if that is needed
         fields=self.dynfields()
         sql="insert into "+self.tablename +"("+",".join(fields)+") values("+",".join('?'*len(fields)) +")"
         param=[]

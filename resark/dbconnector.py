@@ -6,15 +6,10 @@ def tree():
     return collections.defaultdict(tree)
     # Makes handling of multidimentional dicts easier
 
-
+# Class for connection to the data base, contains also a few utility-functions to handle data
 
 class dbconnector:
-    
-    def listdata(table):
-        sql = "search id,name from "+table
         
-
-
     def __init__(self):
         self.cursor=None
         pass
@@ -26,6 +21,7 @@ class dbconnector:
             self.cursor.execute("select username,fullname,email,hashedpassword from users where username =? and hashedpassword=?",username,password)
             u=self.cursor.fetchall()
             authOK= len(u)==1
+        # The only way to authenticate is if the sql ran well and returned one record
         except pyodbc.DataError:
             authOK=False
         except IndexError:
@@ -47,10 +43,7 @@ class dbconnector:
         self.cursor.execute(sql)
         table=self.cursor.fetchall()
         return(table)
-    
-    
-    
-        
+            
     def fetchdict(self,sql,params=None):
         if params==None:
             self.cursor.execute(sql)
@@ -63,32 +56,29 @@ class dbconnector:
         return(results)
         
     def connecttodb(self):
+        #self.server="Server=databasix2\\databasix2;"
         self.server="Server=NRPA-3220\\SQLEXPRESS;"
         self.database="DataArkiv"
-        #self.database="DataArkiv_tom"
-        
-        #self.server="Server=databasix2\\databasix2;"
+        #self.database="DataArkiv_tom"    
         connectstring="Driver={SQL Server Native Client 11.0};"+self.server+"Database="+self.database+";"+"Trusted_Connection=yes;Autocommit=False"
-        self.cnxn = pyodbc.connect(
-                      connectstring
-                      )
+        self.cnxn = pyodbc.connect(connectstring)
         self.cursor = self.cnxn.cursor()
         print("connected ",self.server)
         scriptdir="sqlupdate"
+        # Put sql-files with updates in the sqlupdate-subfolder
+        # Preferably one sql-command per file, if more, they should be separated by ;
+        # There cannot be any sql-comments in those files due to simple parsing
         for script in os.listdir(scriptdir):
             sql="select count(id) from datafile where filename=?"
             self.cursor.execute(sql,script)
-            if self.cursor.fetchall()[0][0]==0:
+            if self.cursor.fetchall()[0][0]==0: # I.e. the file has not been run before
                 with open(scriptdir+'\\' + script,'r') as inserts:
                     sqlScript = inserts.readlines()
                     sqlScript=" ".join(sqlScript)
-                   
                     for statement in sqlScript.split(';'):
-                        print(statement)
                         try:
                             self.cursor.execute(statement)
                             self.cursor.commit()
-                            print("OK")
                         except pyodbc.ProgrammingError as e:
                             print(e)
                         except pyodbc.IntegrityError as e:
@@ -125,7 +115,5 @@ class dbconnector:
                 d[col]=None
         return d
     
-    def search(self):
-        True
     
     

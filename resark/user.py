@@ -31,56 +31,28 @@ class User(UserMixin,metadatalist):
         print(self)
     
     def checkexists(self):
+        #checks if the username already exists
         sql="select count(*) from users where username=?"
         self.cursor.execute(sql,self.id)
         return(self.cursor.fetchall()[0][0])
-    
-    
-    def search(self,partial=True):
-        if self.cursor==None:
-            self.connecttodb()
-        fields=[]
-        values=[]
-        for k,v in self.hash().items():
-            print(k,v)
-            if v != None:
-                v=str(v)
-                if partial:
-                    fields.append(k+" like ?")
-                    values.append("%%"+v+"%%")
-                else:
-                    fields.append(k+"=?")
-                    values.append(v)
-        
-        sql = "select "+",".join(self.dynfields()) +" from "+self.tablename
-        if len(values)>0:
-            sql=sql+" where "+(" and ".join(fields))
-        print(sql)
-        print(values)
-        self.cursor.execute(sql,values)
-        set = self.cursor.fetchall()
-        return(set)
+     
     
     def set(self,name,email,password,userclass=0):
+        # Sets all the data in the user object - for a newly defined user
         self.name=name
         self.email=email
         self.set_password(password)
         self.userclass=userclass
     
     def reqset(self,request):
-        print(request)
+        # Sets all the data from a request object
         self.fullname=request["fullname"]
         self.email=request["email"]
         self.set_password(request["hashedpassword"])
         userclass=str(int(request["userclass"]))
         self.userclass=(userclass)
     
-    def fields(self):
-        if self.cursor==None:   
-            self.connecttodb()
-        return(list(self.hash().keys()))
-        
-    
+   
     def save(self):
         sql="insert into users values(?,?,?,?,?)"
         self.cursor.execute(sql,self.id,self.fullname,self.email,self.pw_hash,self.userclass)
