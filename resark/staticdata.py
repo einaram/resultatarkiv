@@ -36,7 +36,7 @@ class metadatalist(dbconnector):
         #for f in uniquefields:
         #    if getattr(self,f)!=None - bygge opp sql...
         sql = "select count (id) from "+self.tablename +" where name=? or shortname =?"
-        print(sql)
+        #print(sql)
         self.cursor.execute(sql,self.name,self.shortname)
         return(self.cursor.fetchall()[0][0])
         
@@ -47,7 +47,7 @@ class metadatalist(dbconnector):
         fields=[]
         values=[]
         for k,v in self.hash().items():
-            print(k,v)
+            # print(k,v)
             if v != None:
                 v=str(v)
                 if partial:
@@ -60,8 +60,8 @@ class metadatalist(dbconnector):
         sql = "select id,"+",".join(self.dynfields()) +" from "+self.tablename
         if len(values)>0:
             sql=sql+" where "+(" and ".join(fields))
-        print(sql)
-        print(values)
+        # print(sql)
+        # print(values)
         self.cursor.execute(sql,values)
         set = self.cursor.fetchall()
         return(set)

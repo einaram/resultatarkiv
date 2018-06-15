@@ -1,6 +1,7 @@
 import pyodbc 
 import collections
 import os 
+import configparser
 
 def tree():
     return collections.defaultdict(tree)
@@ -11,7 +12,7 @@ def tree():
 class dbconnector:
         
     def __init__(self):
-        self.cursor=None
+        self.cursor=self.connecttodb()
         pass
     def checkuser(self,username,password):
         if self.cursor==None:
@@ -45,6 +46,8 @@ class dbconnector:
         return(table)
             
     def fetchdict(self,sql,params=None):
+        if self.cursor==None:
+            self.connecttodb()
         if params==None:
             self.cursor.execute(sql)
         else:
@@ -56,11 +59,17 @@ class dbconnector:
         return(results)
         
     def connecttodb(self):
-        #self.server="Server=databasix2\\databasix2;"
-        self.server="Server=NRPA-3220\\SQLEXPRESS;"
-        self.database="DataArkiv"
+        config=configparser.ConfigParser()
+        config.read('database.ini')
+        print(config)
+        self.server=config['connection']['server']
+        self.database=config['connection']['database']
+        #self.server="Server=databasix2\\databasix2"
+        #self.server="Server=NRPA-3220\\SQLEXPRESS;"
+        #self.database="DataArkiv"
         #self.database="DataArkiv_tom"    
-        connectstring="Driver={SQL Server Native Client 11.0};"+self.server+"Database="+self.database+";"+"Trusted_Connection=yes;Autocommit=False"
+        connectstring="Driver={SQL Server Native Client 11.0};"+self.server+";Database="+self.database+";"+"Trusted_Connection=yes;Autocommit=False"
+        print(connectstring)
         self.cnxn = pyodbc.connect(connectstring)
         self.cursor = self.cnxn.cursor()
         print("connected ",self.server)
@@ -86,7 +95,7 @@ class dbconnector:
                 sql="insert into datafile (filename,imported,md5) values(?,1,'none')"
             self.cursor.execute(sql,script)
             self.cursor.commit()
-                    
+                   
         print("updates OK")
         
     

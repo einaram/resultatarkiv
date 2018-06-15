@@ -2,6 +2,8 @@ import datetime
 
 from .dbconnector import *
 
+# Class to search for and download data
+
 class searchdata(dbconnector):
 
        
@@ -19,19 +21,21 @@ class searchdata(dbconnector):
     
      
     
-    def preparequeryfields(self,table,req,multival=None):
+    def preparequeryfields(self,table,req,multival=None,ignoreZero=True):
+    # Cleans out a request object and enumerates fields 
         self.fielddata=tree()
         self.getcolnames(table)
         for k,v in req.items():
-            if v=="" or v=="0":
-                print("blank")
-                continue
-            print("v=",v,"<")
+            if v=="" or (v=="0" and IgnoreZero):
+                continue # Go to next value
             if k in self.colnames:
+            # Will only use this if k is a column name
                 self.fielddata[k]=v
             elif v=="on":
+            # A checkbox is codeded as Fieldname_value and will have the value "on" is checked
                 p=k.split("_")
                 if p[0] in self.colnames:
+                    # There may be several values that are checked for one field
                     if self.fielddata[p[0]]=={}:
                         self.fielddata[p[0]]=[p[1]]
                     else:
@@ -39,9 +43,9 @@ class searchdata(dbconnector):
         self.fields=[]
         self.values=[]
         for k,v in self.fielddata.items():
-            if type(v)==list:
+            if type(v)==list: # From the checkbox, must possibly check for several values
                 k=k+" in ("+",".join("?"*len(v)) +")"
-                self.values.extend(v)
+                self.values.extend(v) # adds the values on to the list as separate items
             else:
                 k=k+"=?"
                 self.values.append(v)
@@ -49,6 +53,7 @@ class searchdata(dbconnector):
             
                 
     def subtype(self,sql,subselect,idfield,prefix='x',selecttemplate=None,headertemplate=None):
+    # Builds up sql fragments to get separate colums for the different nuclides, values and metadatatypes
         if selecttemplate==None:
             selecttemplate = "{0}.value '{1}'"
         if headertemplate==None:
@@ -64,7 +69,7 @@ class searchdata(dbconnector):
             if i[0]==None or i[1]==None:
                 continue
             id=str(i[0])
-            alias=prefix+id
+            alias=prefix+id # alias to use for the table with the given metadatatype
             select.append(selecttemplate.format(alias,id))
             where.append(alias+" on "+alias+".sampleid=f.id and "+alias+"."+idfield+"="+id)
             header.append(headertemplate.format(i[1]))
@@ -100,6 +105,7 @@ class searchdata(dbconnector):
         self.cursor.execute(sql,values)
         lastrow=[]
         while True: 
+        # TODO: Write to an excel file
             row=self.cursor.fetchone()
             if row is None: 
                 break

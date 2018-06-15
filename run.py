@@ -235,8 +235,8 @@ def newuser():
     return staticdata("users")
 
 def staticdata(table):
-    print(request.path)
-    print(table)
+   # print(request.path)
+   # print(table)
     searchbuttontext="Søk"
     savebuttontext="Lagre"
     set=None
