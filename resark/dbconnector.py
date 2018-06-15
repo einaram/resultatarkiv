@@ -68,7 +68,7 @@ class dbconnector:
         #self.server="Server=NRPA-3220\\SQLEXPRESS;"
         #self.database="DataArkiv"
         #self.database="DataArkiv_tom"    
-        connectstring="Driver={SQL Server Native Client 11.0};"+self.server+";Database="+self.database+";"+"Trusted_Connection=yes;Autocommit=False"
+        connectstring="Driver={SQL Server Native Client 11.0};Server="+self.server+";Database="+self.database+";"+"Trusted_Connection=yes;Autocommit=False"
         print(connectstring)
         self.cnxn = pyodbc.connect(connectstring)
         self.cursor = self.cnxn.cursor()
