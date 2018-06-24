@@ -109,3 +109,4 @@ testdata/
 test*.py
 export*
 
+wfastcgi.py

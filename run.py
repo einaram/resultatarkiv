@@ -248,7 +248,7 @@ def staticdata(table):
             mtdt=metadatalist(table,req=request.form)
             # mtdt.getcolumns()    
         if searchbuttontext ==  request.form['button']:    
-            set=mtdt.search()
+            set=mtdt.search(readable=True)
         elif savebuttontext == request.form['button']:
             n=mtdt.checkexists(request.form)
             if table=="users":

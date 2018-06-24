@@ -69,7 +69,6 @@ class dbconnector:
         #self.database="DataArkiv"
         #self.database="DataArkiv_tom"    
         connectstring="Driver={SQL Server Native Client 11.0};Server="+self.server+";Database="+self.database+";"+"Trusted_Connection=yes;Autocommit=False"
-        print(connectstring)
         self.cnxn = pyodbc.connect(connectstring)
         self.cursor = self.cnxn.cursor()
         print("connected ",self.server)
@@ -78,6 +77,8 @@ class dbconnector:
         # Preferably one sql-command per file, if more, they should be separated by ;
         # There cannot be any sql-comments in those files due to simple parsing
         for script in os.listdir(scriptdir):
+            if not script.endswith(".sql"):
+                continue
             sql="select count(id) from datafile where filename=?"
             self.cursor.execute(sql,script)
             if self.cursor.fetchall()[0][0]==0: # I.e. the file has not been run before
@@ -86,6 +87,8 @@ class dbconnector:
                     sqlScript=" ".join(sqlScript)
                     for statement in sqlScript.split(';'):
                         try:
+                            if statement=='':
+                                continue
                             self.cursor.execute(statement)
                             self.cursor.commit()
                         except pyodbc.ProgrammingError as e:

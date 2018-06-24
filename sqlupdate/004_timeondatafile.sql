@@ -1,0 +1,1 @@
+alter table datafile add inserted datetime default current_timestamp;

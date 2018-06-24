@@ -27,7 +27,7 @@ class metadatalist(dbconnector):
                 self.shortname=self.shortname.upper()
         except AttributeError:
             # if so, just ignore it - there is no shortname - maybe better to explicitely ask if the attribute exists
-            True
+            pass
         self.columns=None
         self.cursor=self.connecttodb()
     
@@ -41,7 +41,7 @@ class metadatalist(dbconnector):
         return(self.cursor.fetchall()[0][0])
         
     
-    def search(self,partial=True):
+    def search(self,partial=True,readable=False):
         # partial - searches for a string anywhere within a field
         # TODO: Return a limited number of values
         fields=[]
@@ -58,6 +58,10 @@ class metadatalist(dbconnector):
                     values.append(v)
         
         sql = "select id,"+",".join(self.dynfields()) +" from "+self.tablename
+        
+        if readable:
+            sql=sql+"_full"
+        print(sql)
         if len(values)>0:
             sql=sql+" where "+(" and ".join(fields))
         # print(sql)
