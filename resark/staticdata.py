@@ -33,16 +33,24 @@ class metadatalist(dbconnector):
     
     
     def checkexists(self,req,uniquefields=["name","shortname"]):
-        #for f in uniquefields:
-        #    if getattr(self,f)!=None - bygge opp sql...
-        sql = "select count (id) from "+self.tablename +" where name=? or shortname =?"
-        #print(sql)
+        if self.columns==None:
+            self.getcolnames()
+        # Checking if a record already exists.
+        # uniquefields: list of fields that must be unique - presently not used
+        fieldlist=[]
+        for f in uniquefields:
+            if f in self.colnames:
+                fieldlist.append(f+"=?")
+        
+        sql = "select count (id) from "+self.tablename +" where "+ " or ".join(fieldlist)
+        print(sql)
         self.cursor.execute(sql,self.name,self.shortname)
         return(self.cursor.fetchall()[0][0])
         
     
     def search(self,partial=True,readable=False):
         # partial - searches for a string anywhere within a field
+        # readable - using a view to make a readable list rather than listing id values.
         # TODO: Return a limited number of values
         fields=[]
         values=[]
@@ -51,21 +59,22 @@ class metadatalist(dbconnector):
             if v != None:
                 v=str(v)
                 if partial:
+                    # Partial match
+                    # Todo: This will not work for non-text fields. 
                     fields.append(k+" like ?")
                     values.append("%%"+v+"%%")
                 else:
                     fields.append(k+"=?")
                     values.append(v)
         
-        sql = "select id,"+",".join(self.dynfields()) +" from "+self.tablename
-        
-        if readable:
+        sql = "select id,"+",".join(self.dynfields()) +" from "+self.tablename       
+        if readable: 
+        # No! adding _full on self.tablename will mess up other things. The table is the basic unit
             sql=sql+"_full"
-        print(sql)
-        if len(values)>0:
+        if len(values)>0: 
+        # If no search value is given, the whole table is to be returned. 
+        # Presently that is desired, but it may be changed later on
             sql=sql+" where "+(" and ".join(fields))
-        # print(sql)
-        # print(values)
         self.cursor.execute(sql,values)
         set = self.cursor.fetchall()
         return(set)
