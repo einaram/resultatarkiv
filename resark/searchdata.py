@@ -8,7 +8,8 @@ class searchdata(dbconnector):
 
        
     def countsamples(self,req):
-        #req=dict(req)
+        # Shows the number of sample available per project for the actual query
+        # req: Dataset collected from a request object
         table='sample'
         self.preparequeryfields(table,req)
         sql="select projectid,count(sample.id),projects.name,projects.contact,projects.dataowner,projects.restrictions from sample left join projects on projectid=projects.id "
@@ -21,13 +22,17 @@ class searchdata(dbconnector):
     
      
     
-    def preparequeryfields(self,table,req,multival=None,ignoreZero=True):
-    # Cleans out a request object and enumerates fields 
+    def preparequeryfields(self,table,req,ignoreZero=True):
+        # Cleans out a request object and enumerates fields 
+        # Table: Table to be queried
+        # req: Requestobject
+        # ignoreZero: True if numeric zero values from the request object should be ignored
+        #             if this is set to false, a 0 value from the request object will be matched
         self.fielddata=tree()
         self.getcolnames(table)
         for k,v in req.items():
             if v=="" or (v=="0" and IgnoreZero):
-                continue # Go to next value
+                continue # Go to next value - considered non-significant
             if k in self.colnames:
             # Will only use this if k is a column name
                 self.fielddata[k]=v
@@ -53,7 +58,13 @@ class searchdata(dbconnector):
             
                 
     def subtype(self,sql,subselect,idfield,prefix='x',selecttemplate=None,headertemplate=None):
-    # Builds up sql fragments to get separate colums for the different nuclides, values and metadatatypes
+        # Builds up sql fragments to get separate colums for the different nuclides, values and metadatatypes
+        # subselect: A sql to find which of the actual valuetypes are used
+        # idfield: id field in the queried table
+        # prefix: Prefix to use for the queried table in the aliases 
+        # selecttemplate: Template for the select part of the query
+        # Headertemplate: Template for the header in the result table
+        
         if selecttemplate==None:
             selecttemplate = "{0}.value '{1}'"
         if headertemplate==None:
@@ -78,7 +89,9 @@ class searchdata(dbconnector):
     
     
     def download(self,req,folder):
-        print(req)
+        # Builds up a sql command to fetch all the desired data making a pivot table on the results. Runs the sql and stores the data
+        # req: request object
+        # folder: Where to store the data
         self.preparequeryfields('sample',req)
         subselect="(select id from sample where "+' and '.join(self.fields)+")"
         sql="select distinct m.id,name from metadatalist m right join samplemetadata on m.id = metadataid where sampleid in "+subselect
@@ -96,6 +109,7 @@ class searchdata(dbconnector):
         sqlfrom="from fullsample f left join samplevalue_unit "+" left join samplevalue_unit ".join(nuclidedata[1]) +" left join samplemetadata "+" left join samplemetadata ".join(metadata[1]) +" left join samplevalue_unit "+" left join samplevalue_unit ".join(quantitydata[1]) 
         sqlwhere=" where f.id in "+subselect
         sql=sqlselect+sqlfrom+sqlwhere
+        
         timestamp=datetime.datetime.now().strftime("%y%m%d_%H%M%S")
         self.filename="resultatarkiv_"+timestamp+".csv"
         wf=open(folder+"/"+self.filename,"w")

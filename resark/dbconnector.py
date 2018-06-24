@@ -103,12 +103,14 @@ class dbconnector:
         
     
     def getcolumns(self,table=None):
+        # Fetches information on all columns in active table
         if table==None:
             table=self.tablename
         sql="select column_name,is_nullable,data_type,character_maximum_length from information_schema.columns where table_name=?"
         self.columns=self.fetchdict(sql,(table))
     
     def getcolnames(self,table=None):
+        # makes a list of the column names in the active table
         self.getcolumns(table)
         cols=[]
         for col in self.columns:
