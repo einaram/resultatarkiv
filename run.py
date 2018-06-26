@@ -138,7 +138,7 @@ def search():
             nfound=search.countsamples(request.args)
         elif downloadbuttontext ==  request.args.get('button'):
             search.download(request.args,UPLOAD_FOLDER)
-            return send_from_directory(directory=app.config['UPLOAD_FOLDER'], filename=search.filename,as_attachment=True)
+            return send_from_directory(directory=app.config['UPLOAD_FOLDER'], filename=search.excelfile,as_attachment=True)
         else:
             print("Unknown button")
         pass

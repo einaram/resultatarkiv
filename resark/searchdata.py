@@ -1,6 +1,9 @@
 import datetime
+from openpyxl import Workbook
+
 
 from .dbconnector import *
+
 
 # Class to search for and download data
 
@@ -111,12 +114,19 @@ class searchdata(dbconnector):
         sql=sqlselect+sqlfrom+sqlwhere
         
         timestamp=datetime.datetime.now().strftime("%y%m%d_%H%M%S")
+        self.excelfile="resultatarkiv_"+timestamp+".xlsx"
+        wb = Workbook(write_only=True)
+        ws = wb.create_sheet()        
         self.filename="resultatarkiv_"+timestamp+".csv"
         wf=open(folder+"/"+self.filename,"w")
         sep=";"
         self.preparequeryfields('fullsample',req)
-        wf.write(sep.join(self.colnames)+sep+sep.join(nuclidedata[2])+sep+sep.join(metadata[2])+"\n")
-        self.cursor.execute(sql,values)
+        nucheader=sep.join(nuclidedata[2]).split(sep)
+        header=self.colnames+nucheader+metadata[2]
+        wf.write(sep.join(header)+"\n")
+        
+        ws.append(header)
+        self.cursor.execute(sql,values) 
         lastrow=[]
         while True: 
         # TODO: Write to an excel file
@@ -126,9 +136,10 @@ class searchdata(dbconnector):
             row = map(lambda x: '' if x==None else x, row)
             row = list(map(str,row))
             if lastrow!=row:
+                ws.append(row)
                 wf.write(sep.join(row)+"\n")
             lastrow=row
-        
+        wb.save(folder+"/"+self.excelfile)
         
     def  overviewfields(self):
         return( ["Antall","Prosjekt","Kontaktperson","Dataeier","Restriksjoner"] )
