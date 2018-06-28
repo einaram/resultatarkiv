@@ -100,7 +100,7 @@ class searchdata(dbconnector):
         sql="select distinct m.id,name from metadatalist m right join samplemetadata on m.id = metadataid where sampleid in "+subselect
         values=self.values
         metadata=self.subtype(sql,subselect,'metadataid','m')
-        sql="select distinct q.id,name from quantitylist q right join samplevalue on q.id=quantityid where sampleid in "+subselect 
+        sql="select distinct q.id,name from quantitylist q right join samplevalue on q.id=quantityid where q.activity=0 and sampleid in "+subselect 
         headertemplate="{0};{0}_unit "
         selecttemplate="{0}.value '{1}_act',{0}.unit "
         quantitydata=self.subtype(sql,subselect,'quantityid','q',selecttemplate,headertemplate)
@@ -112,7 +112,8 @@ class searchdata(dbconnector):
         sqlfrom="from fullsample f left join samplevalue_unit "+" left join samplevalue_unit ".join(nuclidedata[1]) +" left join samplemetadata "+" left join samplemetadata ".join(metadata[1]) +" left join samplevalue_unit "+" left join samplevalue_unit ".join(quantitydata[1]) 
         sqlwhere=" where f.id in "+subselect
         sql=sqlselect+sqlfrom+sqlwhere
-        
+        # Here be dragons, be careful with the sql!
+        #TODO: - make nuclide part query even more complicated to avoid n^2 rows when there are n rows with data from a nuclide - eg different units or labs
         timestamp=datetime.datetime.now().strftime("%y%m%d_%H%M%S")
         self.excelfile="resultatarkiv_"+timestamp+".xlsx"
         wb = Workbook(write_only=True)
@@ -120,24 +121,22 @@ class searchdata(dbconnector):
         self.filename="resultatarkiv_"+timestamp+".csv"
         wf=open(folder+"/"+self.filename,"w")
         sep=";"
-        self.preparequeryfields('fullsample',req)
+        self.preparequeryfields('fullsample',req) 
         nucheader=sep.join(nuclidedata[2]).split(sep)
-        header=self.colnames+nucheader+metadata[2]
+        quantheader=sep.join(quantitydata[2]).split(sep)
+        header=self.colnames+nucheader+metadata[2]+quantheader
         wf.write(sep.join(header)+"\n")
-        
         ws.append(header)
         self.cursor.execute(sql,values) 
         lastrow=[]
         while True: 
-        # TODO: Write to an excel file
             row=self.cursor.fetchone()
-            if row is None: 
+            if row is None: # Finished reading from data set
                 break
-            row = map(lambda x: '' if x==None else x, row)
-            row = list(map(str,row))
-            if lastrow!=row:
+            row = list(map(lambda x: '' if x==None else x, row))
+            if lastrow!=row: # in some cases duplicate rows may be returned
                 ws.append(row)
-                wf.write(sep.join(row)+"\n")
+                wf.write(sep.join(map(str,row))+"\n")
             lastrow=row
         wb.save(folder+"/"+self.excelfile)
         
